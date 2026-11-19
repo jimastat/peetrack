@@ -59,7 +59,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .rank-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e8edf3;font-size:12px}
 .rank-list li:last-child{border:0}
 .rank-list b{font-variant-numeric:tabular-nums}
-.utility-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.utility-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .utility{min-height:72px;border:1px solid #e1e6ef;border-radius:14px;background:#f5f7fb;color:#25344d;font-size:11px;font-weight:750;padding:9px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .utility .ico{font-size:20px}
 .history-panel{padding:10px 14px}
@@ -91,6 +91,24 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
 #toast.show{opacity:1}
 @media(max-width:420px){.history-panel{padding:9px 10px}.history-panel .section-head h2{font-size:12px}#mapFilters button{font-size:10px;padding:9px 6px}#app{padding:8px;gap:9px}.panel{padding:13px}.action{font-size:14px;min-height:58px}.stats-grid .value{font-size:18px}.stats-grid .label{font-size:10px}.utility{font-size:10px}.brand h1{font-size:20px}}
 @media(min-width:700px){#app{padding:18px}.action{font-size:17px}.panel{padding:18px}}
+
+.data-overlay[hidden]{display:none!important}
+.data-overlay{position:fixed;inset:0;z-index:3000;background:#0e1928a6;display:flex;justify-content:center;align-items:center;padding:12px}
+.data-sheet{background:#fff;border-radius:20px;width:min(680px,100%);height:min(780px,92dvh);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 60px #0004}
+.data-sheet-head,.data-sheet-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px;border-bottom:1px solid #e5eaf1}
+.data-sheet-head h2{margin:0 0 4px;font-size:19px}.data-sheet-head small{color:#66738a}
+.data-sheet-head button{background:#f0f3f8;border:0;border-radius:10px;padding:9px 12px;font-size:16px}
+.data-tools{display:flex;gap:8px;padding:12px;border-bottom:1px solid #e5eaf1}
+.data-tools input{flex:1;min-width:0}.data-tools input,.data-tools select{border:1px solid #d7e0eb;border-radius:10px;padding:10px 8px;background:white;font-size:13px}
+.data-list{overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain}
+.data-record{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #e9edf3}
+.data-record-info{flex:1;min-width:0}.data-record-info strong{display:block;font-size:13px}.data-record-info small{display:block;font-size:11px;color:#68768b;margin-top:4px;overflow-wrap:anywhere}
+.data-record button{border:1px solid #d7e0eb;background:#f4f7fb;border-radius:9px;padding:9px 10px;font-size:12px;font-weight:700;color:#234e89}
+.data-record button.delete-record{color:#a52a2a;background:#fff2f2;border-color:#f0c7c7}
+.data-empty{padding:30px 16px;text-align:center;color:#66738a;font-size:13px}
+.data-sheet-foot{border-top:1px solid #e5eaf1;border-bottom:0;font-size:12px;color:#66738a}
+.data-sheet-foot button{border:0;background:#1769e8;color:white;border-radius:10px;padding:10px 16px;font-weight:700}
+@media(max-width:420px){.data-overlay{padding:0;align-items:flex-end}.data-sheet{height:94dvh;border-radius:18px 18px 0 0}.data-tools select{max-width:100px}.data-record{padding:11px 9px;gap:5px}.data-record button{padding:9px 7px}}
 </style>
 </head>
 <body>
@@ -153,17 +171,22 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
   </section>
 
   <section class="panel">
-    <div class="section-head"><h2>⚙️ Data & map</h2><small>Manage your records</small></div>
+    <div class="section-head"><h2>⚙️ Data &amp; Utilities</h2><small>Manage your records</small></div>
     <div class="utility-grid">
+      <button class="utility" id="viewDataBtn"><span class="ico">☷</span>View all data</button>
       <button class="utility" id="exportBtn"><span class="ico">↥</span>Export data</button>
-      <button class="utility" id="heatBtn"><span class="ico">🌈</span>Heatmap</button>
-      <button class="utility" id="cacheBtn"><span class="ico">⬇</span>Cache map</button>
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
-    <progress id="cacheBar" value="0" max="100"></progress>
-    <div id="cacheProgress"></div>
   </section>
   <footer id="footerStats">0 walks · 0 pee events logged</footer>
+</div>
+<div id="dataOverlay" class="data-overlay" hidden>
+  <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
+    <div class="data-sheet-head"><div><h2 id="dataTitle">All pee data</h2><small id="dataTotal">0 records</small></div><button type="button" id="closeDataBtn" aria-label="Close data list">✕</button></div>
+    <div class="data-tools"><input type="search" id="dataSearch" placeholder="Search date, time or coordinates" aria-label="Search pee records"><select id="dataPeriod" aria-label="Filter records by date"><option value="all">All time</option><option value="today">Today</option><option value="week">7 days</option><option value="month">30 days</option></select></div>
+    <div id="dataList" class="data-list"></div>
+    <div class="data-sheet-foot"><span id="dataShowing"></span><button type="button" id="closeDataBottom">Done</button></div>
+  </section>
 </div>
 <div id="toast"></div>
 
@@ -416,7 +439,6 @@ function toggleHeatmap(){
   else{if(heatLayer)map.removeLayer(heatLayer);peeMarkersLayer.addTo(map);}
   updateStats();setStatus(heatVisible?'Heatmap view on':'Grouped pee markers shown');
 }
-$('heatBtn').addEventListener('click',toggleHeatmap);
 $('mapLayerBtn').addEventListener('click',toggleHeatmap);
 $('locateBtn').addEventListener('click',centerOnMe);
 $('detailsBtn').addEventListener('click',()=>{$('insightDetails').classList.toggle('open');$('detailsBtn').textContent=$('insightDetails').classList.contains('open')?'Hide details ⌃':'View details ›';});
@@ -431,33 +453,60 @@ $('clearBtn').addEventListener('click',()=>{
   }
 });
 
-/* Retains the original 5-mile tile-cache workflow. */
-const CACHE_NAME='pee-tracker-tiles-v1',MILES_TO_METERS=1609.34,CACHE_RADIUS_MILES=5,CACHE_ZOOM_LEVELS=[14,15,16,17],TILE_SUBDOMAINS=['a','b','c'];
-function lonLatToTile(lat,lon,z){const n=2**z,x=Math.floor((lon+180)/360*n),latRad=lat*Math.PI/180,y=Math.floor((1-Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*n);return{x,y};}
-function metersToDegreesLat(m){return m/111320;}
-function metersToDegreesLon(m,lat){return m/(111320*Math.cos(lat*Math.PI/180));}
-function buildTileList(lat,lon,radiusMiles,zooms){
-  const r=radiusMiles*MILES_TO_METERS,dLat=metersToDegreesLat(r),dLon=metersToDegreesLon(r,lat),tiles=[];
-  zooms.forEach(z=>{const a=lonLatToTile(lat+dLat,lon-dLon,z),b=lonLatToTile(lat-dLat,lon+dLon,z);for(let x=Math.min(a.x,b.x);x<=Math.max(a.x,b.x);x++)for(let y=Math.min(a.y,b.y);y<=Math.max(a.y,b.y);y++)tiles.push({z,x,y});});
-  return tiles;
+// Data browser: original record indices are used so deletion always targets the correct event.
+const dataOverlay=$('dataOverlay');
+function dataPeriodStart(period){
+  if(period==='all')return -Infinity;
+  const d=new Date();
+  if(period==='today')d.setHours(0,0,0,0);
+  else d.setTime(d.getTime()-(period==='week'?7:30)*86400000);
+  return d.getTime();
 }
-async function cacheTiles(lat,lon){
-  const tiles=buildTileList(lat,lon,CACHE_RADIUS_MILES,CACHE_ZOOM_LEVELS),bar=$('cacheBar');if(tiles.length>6000&&!confirm(`This will request ${tiles.length} map tiles and use data. Continue?`))return;
-  let cache;try{cache=await caches.open(CACHE_NAME);}catch(e){setStatus('Browser cache storage is unavailable.');return;}
-  bar.style.display='block';bar.max=tiles.length;bar.value=0;let done=0,failed=0;
-  for(const t of tiles){const sub=TILE_SUBDOMAINS[(t.x+t.y)%3],url=`https://${sub}.tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`;
-    try{if(!await cache.match(url)){const response=await fetch(url,{mode:'cors'});if(response.ok)await cache.put(url,response);else failed++;}}catch(e){failed++;}
-    done++;bar.value=done;$('cacheProgress').textContent=`Caching map tiles: ${done}/${tiles.length}${failed?` · ${failed} failed`:''}`;
-    if(done%20===0)await new Promise(r=>setTimeout(r,60));
-  }
-  $('cacheProgress').textContent=`Finished · ${done-failed}/${tiles.length} tiles cached. Browser and map-provider limits may affect offline use.`;
-  setStatus('Map tile caching finished.');
+function renderDataList(){
+  if(dataOverlay.hidden)return;
+  const q=$('dataSearch').value.trim().toLowerCase(),start=dataPeriodStart($('dataPeriod').value);
+  const list=data.pees.map((p,index)=>({p,index})).filter(({p})=>{
+    const date=new Date(p.timestamp),time=date.getTime();
+    if(!Number.isFinite(time)||time<start)return false;
+    const searchable=[date.toLocaleString(),date.toLocaleDateString(),date.toLocaleTimeString(),String(p.lat??''),String(p.lng??'')].join(' ').toLowerCase();
+    return searchable.includes(q);
+  }).sort((a,b)=>new Date(b.p.timestamp)-new Date(a.p.timestamp));
+  $('dataTotal').textContent=`${data.pees.length} total pee records`;
+  $('dataShowing').textContent=`Showing ${list.length} of ${data.pees.length}`;
+  const root=$('dataList');root.replaceChildren();
+  if(!list.length){const empty=document.createElement('div');empty.className='data-empty';empty.textContent='No pee records match this filter.';root.appendChild(empty);return;}
+  const frag=document.createDocumentFragment();
+  list.forEach(({p,index})=>{
+    const row=document.createElement('div');row.className='data-record';
+    const info=document.createElement('div');info.className='data-record-info';
+    const date=document.createElement('strong');date.textContent=new Date(p.timestamp).toLocaleString();
+    const coords=document.createElement('small');coords.textContent=`${Number.isFinite(p.lat)&&Number.isFinite(p.lng)?`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`:'No valid coordinates'}${Number.isFinite(p.accuracy)?` · GPS ±${Math.round(p.accuracy)}m`:''}`;
+    info.append(date,coords);row.appendChild(info);
+    const locate=document.createElement('button');locate.type='button';locate.textContent='Map';locate.disabled=!Number.isFinite(p.lat)||!Number.isFinite(p.lng);
+    locate.addEventListener('click',()=>{
+      closeDataList();selectedPeriod='all';$('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period==='all'));
+      if(heatVisible)toggleHeatmap();
+      renderPeeMarkers();refreshHeatmap();renderWalkRoutes();updateStats();
+      map.setView([p.lat,p.lng],19);setTimeout(()=>map.invalidateSize(),80);
+      window.scrollTo({top:0,behavior:'smooth'});toast('Showing selected pee location');
+    });
+    const del=document.createElement('button');del.type='button';del.className='delete-record';del.textContent='Delete';
+    del.addEventListener('click',()=>{
+      if(!confirm(`Delete the pee recorded ${new Date(p.timestamp).toLocaleString()}? This cannot be undone.`))return;
+      data.pees.splice(index,1);saveData();map.closePopup();renderExistingData();renderDataList();toast('Pee entry deleted');
+    });
+    row.append(locate,del);frag.appendChild(row);
+  });root.appendChild(frag);
 }
-$('cacheBtn').addEventListener('click',()=>{
-  if(!('caches'in window)||!navigator.geolocation){setStatus('Caching or location is not supported by this browser.');return;}
-  setStatus('Getting location for 5-mile map cache…');
-  navigator.geolocation.getCurrentPosition(pos=>cacheTiles(pos.coords.latitude,pos.coords.longitude),err=>setStatus('Could not get location: '+err.message),{enableHighAccuracy:true,timeout:15000});
-});
+function openDataList(){dataOverlay.hidden=false;document.body.style.overflow='hidden';renderDataList();$('dataSearch').focus();}
+function closeDataList(){dataOverlay.hidden=true;document.body.style.overflow='';}
+$('viewDataBtn').addEventListener('click',openDataList);
+$('closeDataBtn').addEventListener('click',closeDataList);
+$('closeDataBottom').addEventListener('click',closeDataList);
+$('dataSearch').addEventListener('input',renderDataList);
+$('dataPeriod').addEventListener('change',renderDataList);
+dataOverlay.addEventListener('click',e=>{if(e.target===dataOverlay)closeDataList();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!dataOverlay.hidden)closeDataList();});
 window.addEventListener('resize',()=>map.invalidateSize());
 </script>
 </body>
