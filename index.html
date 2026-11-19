@@ -272,7 +272,7 @@ function renderPeeMarkers(){
       const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${count>=10?'many':''}">${count}</div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
       const marker=L.marker([g.lat,g.lng],{icon}).addTo(peeMarkersLayer);
       marker.bindPopup(popupForGroup(g),{maxWidth:290});
-      marker.on('click',()=>{if(map.getZoom()<18){map.setView([g.lat,g.lng],Math.min(18,map.getZoom()+2));}});
+      // The bound popup opens on tap; leave zoom and map position unchanged.
     }
   });
 }
