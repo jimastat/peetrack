@@ -3,538 +3,332 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#172235">
 <title>Pee Tracker</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-
-.btn-active {
-  transform: scale(0.95);
-  transition: none;
-  filter: brightness(1.15);
-}
-#actionToast {
-  grid-column: span 2;
-  text-align: center;
-  font-size: 13px;
-  font-weight: bold;
-  color: #2e7d32;
-  min-height: 16px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-#actionToast.show { opacity: 1; }
-#actionToast.error { color: #c62828; }
-
-  
-  html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    font-family: -apple-system, system-ui, sans-serif;
-    overflow: hidden;
-  }
-  #app {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-  }
-  #map {
-    flex: 1 1 auto;
-    min-height: 0;
-    width: 100%;
-  }
-  #controls {
-    flex: 0 0 auto;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    padding: 10px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
-    box-sizing: border-box;
-    background: #f5f5f5;
-  }
-  button {
-    font-size: 15px;
-    padding: 12px 8px;
-    border: none;
-    border-radius: 10px;
-    font-weight: bold;
-    cursor: pointer;
-    touch-action: manipulation;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  button:active { transform: scale(0.97); }
-
-  #startBtn { background: #2e7d32; color: white; }
-  #stopBtn { background: #c62828; color: white; }
-  #peeBtn { background: #f9a825; color: black; font-size: 18px; grid-column: span 2; }
-  #heatBtn { background: #1565c0; color: white; grid-column: span 2; }
-  #exportBtn, #clearBtn { background: #555; color: white; font-size: 13px; }
-  #cacheBtn { background: #555; color: white; font-size: 13px; grid-column: span 2; }
-
-  #status { grid-column: span 2; font-size: 13px; color: #333; text-align: center; min-height: 18px; }
-  #stats { grid-column: span 2; font-size: 12px; color: #555; text-align: center; }
-  #cacheProgress { grid-column: span 2; font-size: 12px; color: #1565c0; text-align: center; min-height: 16px; }
-  progress { grid-column: span 2; width: 100%; height: 10px; }
-
-  @media (min-width: 600px) {
-    #controls { grid-template-columns: repeat(6, 1fr); }
-    #peeBtn, #heatBtn, #cacheBtn { grid-column: span 2; }
-    #status, #stats, #cacheProgress, progress { grid-column: span 6; }
-  }
+:root{--ink:#172235;--muted:#66738a;--blue:#1769e8;--green:#27833b;--red:#c73532;--gold:#e9a51c;--panel:#fff;--bg:#edf1f7}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:900px;margin:0 auto;padding:10px;display:flex;flex-direction:column;gap:12px}
+header{background:linear-gradient(135deg,#172235,#26364f);color:white;border-radius:22px;padding:14px 17px;display:flex;align-items:center;gap:13px;box-shadow:0 5px 18px #14223824}
+.paw{font-size:34px;line-height:1}
+.brand{min-width:0;flex:1}
+.brand h1{font-size:22px;margin:0 0 3px;font-weight:800}
+.brand p{font-size:13px;color:#c5cfdf;margin:0}
+#walkBadge{font-size:11px;font-weight:800;letter-spacing:.04em;padding:6px 9px;border-radius:20px;background:#ffffff20;color:#e8edf7;white-space:nowrap}
+#walkBadge.live{background:#1c873d;color:white}
+.map-card{position:relative;background:#dce3ec;border-radius:22px;overflow:hidden;box-shadow:0 4px 16px #17223518}
+#map{height:clamp(290px,43vh,470px);width:100%;z-index:1}
+.map-legend{position:absolute;z-index:500;right:12px;top:12px;background:#fffffff0;border-radius:13px;padding:9px 11px;box-shadow:0 2px 10px #17223520;font-size:12px;font-weight:700}
+.gradient{width:125px;height:10px;border-radius:20px;margin-top:6px;background:linear-gradient(90deg,#263bff,#18c8ff,#36e65b,#ffe32c,#ff3b19)}
+.map-count{position:absolute;z-index:500;left:12px;bottom:12px;background:#fffffff0;border-radius:13px;padding:9px 12px;box-shadow:0 2px 10px #17223520;font-size:13px;font-weight:800}
+.map-count span{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:2px}
+.map-actions{position:absolute;z-index:500;left:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.map-actions button{width:38px;height:38px;border:0;border-radius:11px;background:#fff;font-size:19px;box-shadow:0 2px 8px #17223524;padding:0}
+.panel{background:var(--panel);border-radius:22px;padding:15px;box-shadow:0 4px 16px #17223512}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
+.section-head h2{font-size:17px;margin:0;font-weight:800}
+.section-head small{color:var(--muted);font-size:12px}
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+button{font:inherit;cursor:pointer;touch-action:manipulation}
+.action{border:0;border-radius:16px;min-height:62px;padding:12px 10px;color:white;font-weight:800;font-size:16px;box-shadow:inset 0 -3px 0 #00000012;transition:transform .08s,filter .08s}
+.action:active,.utility:active{transform:scale(.98);filter:brightness(.96)}
+#startBtn{background:linear-gradient(135deg,#399c4b,#237332)}
+#stopBtn{background:linear-gradient(135deg,#e14b43,#b92327)}
+#peeBtn{grid-column:1/-1;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
+.action:disabled{opacity:.42;cursor:not-allowed}
+.status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.stat{text-align:center;padding:5px 6px;border-right:1px solid #e3e8ef}
+.stat:last-child{border:0}
+.stat .value{font-size:21px;font-weight:850;line-height:1.2;white-space:nowrap}
+.stat .label{font-size:11px;color:var(--muted);margin-top:4px}
+.stat .symbol{font-size:19px;margin-bottom:4px}
+.insight-callout{margin-top:12px;padding:11px 12px;border-radius:13px;background:#eef6e9;color:#315e28;font-size:13px;line-height:1.4}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
+.detail{background:#f4f6fa;border-radius:13px;padding:11px}
+.detail strong{display:block;font-size:16px;margin-bottom:3px}
+.detail span{font-size:11px;color:var(--muted)}
+#insightDetails{display:none;margin-top:12px}
+#insightDetails.open{display:block}
+#insightDetails h3{font-size:13px;margin:13px 0 7px}
+.rank-list{list-style:none;margin:0;padding:0}
+.rank-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e8edf3;font-size:12px}
+.rank-list li:last-child{border:0}
+.rank-list b{font-variant-numeric:tabular-nums}
+.utility-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.utility{min-height:72px;border:1px solid #e1e6ef;border-radius:14px;background:#f5f7fb;color:#25344d;font-size:11px;font-weight:750;padding:9px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.utility .ico{font-size:20px}
+#cacheBar{width:100%;height:8px;margin-top:10px;display:none}
+#cacheProgress{font-size:11px;color:var(--muted);text-align:center;margin-top:5px}
+footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
+#toast{position:fixed;z-index:2000;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#172235;color:white;border-radius:30px;padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
+#toast.show{opacity:1}
+@media(max-width:420px){#app{padding:8px;gap:9px}.panel{padding:13px}.action{font-size:14px;min-height:58px}.stats-grid .value{font-size:18px}.stats-grid .label{font-size:10px}.utility{font-size:10px}.brand h1{font-size:20px}}
+@media(min-width:700px){#app{padding:18px}.action{font-size:17px}.panel{padding:18px}}
 </style>
-<style>
-.btn-active {
-  transform: scale(0.94);
-  filter: brightness(0.85);
-  transition: transform 0.08s ease, filter 0.08s ease;
-}
- 
-#toast {
-  position: fixed;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(20,20,20,0.9);
-  color: #fff;
-  padding: 10px 18px;
-  border-radius: 20px;
-  font-size: 14px;
-  z-index: 9999;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-#toast.show { opacity: 1; }
-</style>
-
-  
 </head>
 <body>
-
 <div id="app">
-  <div id="map"></div>
-  <div id="controls">
-    <div id="status">Ready</div>
-    <button id="startBtn">▶ Start Walk</button>
-    <button id="stopBtn">⏹ Stop Walk</button>
-    <button id="peeBtn">💦 PEE!</button>
+  <header>
+    <div class="paw">🐾</div>
+    <div class="brand"><h1>Pee Tracker</h1><p id="walkSubtitle">Your dog's walking map</p></div>
+    <div id="walkBadge">READY</div>
+  </header>
 
-    <div id="actionToast"></div>
-    
-    <button id="heatBtn">🔥 Toggle Heatmap</button>
-    <button id="exportBtn">⬇ Export Data</button>
-    <button id="clearBtn">🗑 Clear All</button>
-    <button id="cacheBtn">📥 Cache 5-Mile Map Area (do on WiFi)</button>
-    <progress id="cacheBar" value="0" max="100" style="display:none;"></progress>
+  <section class="map-card" aria-label="Walk and pee location map">
+    <div id="map"></div>
+    <div class="map-actions">
+      <button id="locateBtn" aria-label="Center map on current location" title="Center on me">➤</button>
+      <button id="mapLayerBtn" aria-label="Toggle heatmap" title="Toggle heatmap">🔥</button>
+    </div>
+    <div class="map-legend"><div>Pee density</div><div class="gradient"></div><div style="display:flex;justify-content:space-between;color:#748096;font-size:10px;font-weight:500;margin-top:3px"><span>Less frequent</span><span>More frequent</span></div></div>
+    <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h2>🐾 Take action</h2><small id="walkStatus">Not walking</small></div>
+    <div class="action-grid">
+      <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
+      <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
+      <button class="action" id="peeBtn">💧 &nbsp;Log a pee</button>
+    </div>
+    <div class="status-line" id="status">Ready when you are</div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h2>📊 Insights</h2><button id="detailsBtn" style="border:0;background:none;color:#1769e8;font-weight:750;font-size:12px;padding:5px">View details&nbsp;›</button></div>
+    <div class="stats-grid">
+      <div class="stat"><div class="symbol">🐾</div><div class="value" id="peeTotal">0</div><div class="label">Pee events</div></div>
+      <div class="stat"><div class="symbol">🛣️</div><div class="value" id="walkDistance">—</div><div class="label">Last walk distance</div></div>
+      <div class="stat"><div class="symbol">◷</div><div class="value" id="walkDuration">—</div><div class="label">Last walk time</div></div>
+      <div class="stat"><div class="symbol">📅</div><div class="value" id="lastWalkDate">—</div><div class="label">Last walk</div></div>
+    </div>
+    <div class="insight-callout" id="insightCallout">Log a few walks and pee events to start seeing patterns.</div>
+    <div id="insightDetails">
+      <div class="detail-grid">
+        <div class="detail"><strong id="perMile">—</strong><span>Average pee events per mile</span></div>
+        <div class="detail"><strong id="repeatCount">—</strong><span>Events near a repeat location</span></div>
+        <div class="detail"><strong id="morningCount">—</strong><span>Morning events (5am–noon)</span></div>
+        <div class="detail"><strong id="eveningCount">—</strong><span>Evening events (5pm–midnight)</span></div>
+      </div>
+      <h3>Most frequently marked areas</h3>
+      <ol class="rank-list" id="favoriteList"><li>Not enough data yet</li></ol>
+      <h3>When she marks</h3>
+      <div class="detail"><strong id="peakTime">—</strong><span>Most common time-of-day period</span></div>
+      <p style="font-size:10px;color:#8994a8;line-height:1.4">Location groups are approximate clusters based on events within about 40 metres. They are useful for spotting tendencies, not exact territory boundaries. Pee density reflects recorded events, not time spent at a location.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-head"><h2>⚙️ Data & map</h2><small>Manage your records</small></div>
+    <div class="utility-grid">
+      <button class="utility" id="exportBtn"><span class="ico">↥</span>Export data</button>
+      <button class="utility" id="heatBtn"><span class="ico">🌈</span>Heatmap</button>
+      <button class="utility" id="cacheBtn"><span class="ico">⬇</span>Cache map</button>
+      <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
+    </div>
+    <progress id="cacheBar" value="0" max="100"></progress>
     <div id="cacheProgress"></div>
-    <div id="stats">0 walks, 0 pee events logged</div>
-  </div>
+  </section>
+  <footer id="footerStats">0 walks · 0 pee events logged</footer>
 </div>
+<div id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-  
 <script>
-
-/* ================= STORAGE ================= */
-const STORE_KEY = 'peeTrackerData';
-function loadData() {
-  const raw = localStorage.getItem(STORE_KEY);
-  return raw ? JSON.parse(raw) : { walks: [], pees: [] };
+/* Existing storage key and record structure are retained for compatibility. */
+const STORE_KEY='peeTrackerData';
+function loadData(){
+  try{const raw=localStorage.getItem(STORE_KEY);if(!raw)return{walks:[],pees:[]};const d=JSON.parse(raw);return{walks:Array.isArray(d.walks)?d.walks:[],pees:Array.isArray(d.pees)?d.pees:[]};}
+  catch(e){console.error('Could not read saved data',e);return{walks:[],pees:[]};}
 }
-function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
-let data = loadData();
+function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(data));}
+let data=loadData();
 
-/* ================= MAP SETUP ================= */
-const map = L.map('map', { tap: true }).setView([40.7128, -74.0060], 13);
-
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-const TILE_SUBDOMAINS = ['a', 'b', 'c'];
-
-L.tileLayer(TILE_URL, {
-  maxZoom: 19,
-  attribution: '© OpenStreetMap contributors'
-}).addTo(map);
-
-let currentPosMarker = null;
-let walkPolyline = null;
-let currentWalkCoords = [];
-let watchId = null;
-let isWalking = false;
-let heatLayer = null;
-let heatVisible = false;
-let peeMarkersLayer = L.layerGroup().addTo(map);
-let walkPathsLayer = L.layerGroup().addTo(map);
-
-function statusMsg(msg) { document.getElementById('status').textContent = msg; }
-function updateStats() {
-  document.getElementById('stats').textContent =
-    `${data.walks.length} walks, ${data.pees.length} pee events logged`;
+const map=L.map('map',{tap:true,zoomControl:true}).setView([45.5231,-122.6765],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null;
+const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
+const $=id=>document.getElementById(id);
+function setStatus(msg){$('status').textContent=msg;}
+function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1900);}
+function placeCurrentMarker(lat,lng){if(currentPosMarker)currentPosMarker.setLatLng([lat,lng]);else currentPosMarker=L.circleMarker([lat,lng],{radius:8,color:'#fff',weight:3,fillColor:'#1769e8',fillOpacity:1}).addTo(map);}
+function centerOnMe(){
+  if(!navigator.geolocation){setStatus('Location is not supported by this browser.');return;}
+  setStatus('Finding your location…');
+  navigator.geolocation.getCurrentPosition(pos=>{const{latitude,longitude}=pos.coords;map.setView([latitude,longitude],17);placeCurrentMarker(latitude,longitude);setStatus('Map centered on your location.');},err=>setStatus('Location unavailable: '+err.message),{enableHighAccuracy:true,timeout:15000});
 }
+function haversine(a,b){const R=6371000,toRad=x=>x*Math.PI/180;const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const x=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
+function pathDistance(path){let m=0;for(let i=1;i<(path||[]).length;i++)m+=haversine(path[i-1],path[i]);return m;}
+function fmtDistance(m){const mi=m/1609.344;return mi<.1?`${Math.round(m)} m`:`${mi.toFixed(1)} mi`;}
+function fmtDuration(ms){const mins=Math.max(0,Math.round(ms/60000));return mins<60?`${mins} min`:`${Math.floor(mins/60)}h ${mins%60}m`;}
 
-function renderExistingData() {
-  walkPathsLayer.clearLayers();
-  peeMarkersLayer.clearLayers();
-  data.walks.forEach(w => {
-    if (w.path && w.path.length > 1) {
-      L.polyline(w.path.map(p => [p.lat, p.lng]), { color: 'blue', weight: 3, opacity: 0.5 }).addTo(walkPathsLayer);
-    }
-  });
-  data.pees.forEach(p => {
-    L.circleMarker([p.lat, p.lng], { radius: 6, color: 'orange', fillColor: '#f9a825', fillOpacity: 0.9 })
-      .bindPopup(`Pee at ${new Date(p.timestamp).toLocaleString()}`)
-      .addTo(peeMarkersLayer);
-  });
+function renderExistingData(){
+  walkPathsLayer.clearLayers();peeMarkersLayer.clearLayers();
+  data.walks.forEach(w=>{if(w.path&&w.path.length>1)L.polyline(w.path.map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.55}).addTo(walkPathsLayer);});
+  data.pees.forEach(p=>{if(Number.isFinite(p.lat)&&Number.isFinite(p.lng))L.circleMarker([p.lat,p.lng],{radius:6,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.9}).bindPopup(`Pee logged<br>${new Date(p.timestamp).toLocaleString()}${p.accuracy?`<br>GPS accuracy: ±${Math.round(p.accuracy)}m`:''}`).addTo(peeMarkersLayer);});
+  refreshHeatmap();
+  if(heatVisible){peeMarkersLayer.remove();walkPathsLayer.remove();}
   updateStats();
 }
+function refreshHeatmap(){
+  if(heatLayer)map.removeLayer(heatLayer);
+  const points=data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>[p.lat,p.lng,.65]);
+  heatLayer=L.heatLayer(points,{radius:31,blur:24,maxZoom:18,gradient:{.2:'#273dff',.45:'#20d5e8',.62:'#45e65b',.8:'#ffe02e',1:'#f22b19'}});
+  if(heatVisible)heatLayer.addTo(map);
+}
+function updateStats(){
+  $('peeTotal').textContent=data.pees.length;
+  $('mapCount').innerHTML=`${data.pees.length} pee events<span>All recorded locations · heatmap ${heatVisible?'on':'off'}</span>`;
+  $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
+  const last=data.walks[data.walks.length-1];
+  if(last){
+    const dist=pathDistance(last.path||[]);
+    $('walkDistance').textContent=fmtDistance(dist);
+    $('walkDuration').textContent=last.startTime&&last.endTime?fmtDuration(last.endTime-last.startTime):'—';
+    $('lastWalkDate').textContent=new Date(last.startTime||last.id||Date.now()).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    $('walkSubtitle').textContent=`Last walk · ${fmtDistance(dist)} · ${fmtDuration((last.endTime||0)-(last.startTime||0))}`;
+  }else{$('walkDistance').textContent='—';$('walkDuration').textContent='—';$('lastWalkDate').textContent='—';$('walkSubtitle').textContent='Your dog’s walking map';}
+  updateInsights();
+}
+function clusterPees(events,radius=40){
+  const clusters=[];
+  events.forEach(p=>{
+    let best=null,bestD=Infinity;
+    clusters.forEach(c=>{const d=haversine(p,c.center);if(d<radius&&d<bestD){best=c;bestD=d;}});
+    if(!best)clusters.push({center:{lat:p.lat,lng:p.lng},events:[p]});
+    else{best.events.push(p);const n=best.events.length;best.center.lat+=(p.lat-best.center.lat)/n;best.center.lng+=(p.lng-best.center.lng)/n;}
+  });
+  return clusters.sort((a,b)=>b.events.length-a.events.length);
+}
+function updateInsights(){
+  const valid=data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+  const totalMiles=data.walks.reduce((s,w)=>s+pathDistance(w.path||[]),0)/1609.344;
+  $('perMile').textContent=totalMiles>0?(data.pees.length/totalMiles).toFixed(1):'—';
+  const clusters=clusterPees(valid);
+  const repeat=clusters.filter(c=>c.events.length>1).reduce((s,c)=>s+c.events.length,0);
+  $('repeatCount').textContent=repeat;
+  const hours=valid.map(p=>new Date(p.timestamp).getHours());
+  $('morningCount').textContent=hours.filter(h=>h>=5&&h<12).length;
+  $('eveningCount').textContent=hours.filter(h=>h>=17).length;
+  const buckets={'Early morning (5–8am)':0,'Morning (8am–noon)':0,'Afternoon (noon–5pm)':0,'Evening (5pm–midnight)':0,'Overnight (midnight–5am)':0};
+  hours.forEach(h=>{if(h<5)buckets['Overnight (midnight–5am)']++;else if(h<8)buckets['Early morning (5–8am)']++;else if(h<12)buckets['Morning (8am–noon)']++;else if(h<17)buckets['Afternoon (noon–5pm)']++;else buckets['Evening (5pm–midnight)']++;});
+  const peak=Object.entries(buckets).sort((a,b)=>b[1]-a[1])[0];
+  $('peakTime').textContent=valid.length?`${peak[0]} · ${peak[1]} events`:'Not enough data';
+  const list=$('favoriteList');list.innerHTML='';
+  const top=clusters.slice(0,5);
+  if(!top.length){list.innerHTML='<li>Not enough location data yet</li>';}
+  else top.forEach((c,i)=>{const li=document.createElement('li');li.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'}</b>`;list.appendChild(li);});
+  if(!valid.length)$('insightCallout').textContent='Log a few pee events to reveal repeat locations and time-of-day patterns.';
+  else if(clusters[0]&&clusters[0].events.length>1)$('insightCallout').textContent=`Her most frequently marked area has ${clusters[0].events.length} recorded events. Open details to see the top locations.`;
+  else $('insightCallout').textContent='Your location history is building. Repeat spots will become clearer as you log more walks.';
+}
 renderExistingData();
-
-function placeCurrentMarker(lat, lng) {
-  if (currentPosMarker) {
-    currentPosMarker.setLatLng([lat, lng]);
-  } else {
-    currentPosMarker = L.circleMarker([lat, lng], { radius: 8, color: 'blue', fillColor: '#2196f3', fillOpacity: 1 }).addTo(map);
-  }
-}
-
-let lastKnownLat = null;
-let lastKnownLng = null;
-
-function centerOnMe() {
-  if (!navigator.geolocation) { statusMsg('Geolocation not supported on this browser'); return; }
-  statusMsg('Finding your location...');
-  navigator.geolocation.getCurrentPosition(pos => {
-    const { latitude, longitude } = pos.coords;
-    lastKnownLat = latitude;
-    lastKnownLng = longitude;
-    map.setView([latitude, longitude], 17);
-    placeCurrentMarker(latitude, longitude);
-    statusMsg('Location found');
-  }, err => {
-    statusMsg('Location error: ' + err.message + ' (check location permission)');
-  }, { enableHighAccuracy: true, timeout: 15000 });
-}
 centerOnMe();
+if(data.pees.length){const bounds=L.latLngBounds(data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>[p.lat,p.lng]));if(bounds.isValid())map.fitBounds(bounds.pad(.25),{maxZoom:16});}
+setTimeout(()=>map.invalidateSize(),250);
 
-
-
-/* ================= WALK TRACKING ================= */
-function startWalk() {
-  if (isWalking) { statusMsg('Already walking'); return; }
-  isWalking = true;
-  currentWalkCoords = [];
-  statusMsg('Walking... tracking location');
-  if (walkPolyline) map.removeLayer(walkPolyline);
-  walkPolyline = L.polyline([], { color: 'green', weight: 4 }).addTo(map);
-
-  watchId = navigator.geolocation.watchPosition(pos => {
-    const { latitude, longitude, accuracy } = pos.coords;
-    const point = { lat: latitude, lng: longitude, timestamp: Date.now(), accuracy };
-    currentWalkCoords.push(point);
-    walkPolyline.addLatLng([latitude, longitude]);
-    placeCurrentMarker(latitude, longitude);
-    map.panTo([latitude, longitude]);
-    statusMsg(`Walking... ${currentWalkCoords.length} points (±${Math.round(accuracy)}m)`);
-  }, err => {
-    statusMsg('Location error: ' + err.message);
-  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+function startWalk(){
+  if(isWalking){setStatus('A walk is already in progress.');return;}
+  if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
+  isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
+  if(walkPolyline)map.removeLayer(walkPolyline);
+  walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
+  $('walkBadge').textContent='WALK IN PROGRESS';$('walkBadge').classList.add('live');
+  $('walkStatus').textContent='Tracking';$('startBtn').disabled=true;$('stopBtn').disabled=false;
+  setStatus('Starting GPS tracking…');
+  watchId=navigator.geolocation.watchPosition(pos=>{
+    const{latitude,longitude,accuracy}=pos.coords;
+    const point={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy};
+    currentWalkCoords.push(point);walkPolyline.addLatLng([latitude,longitude]);placeCurrentMarker(latitude,longitude);
+    map.panTo([latitude,longitude],{animate:false});
+    const distance=pathDistance(currentWalkCoords);
+    $('walkStatus').textContent=fmtDistance(distance);
+    setStatus(`Tracking walk · ${fmtDistance(distance)} · GPS ±${Math.round(accuracy)}m`);
+  },err=>setStatus('GPS error: '+err.message),{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
 }
-
-function endWalk() {
-  if (!isWalking) { statusMsg('Not currently walking'); return; }
-  isWalking = false;
-  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-  watchId = null;
-  if (currentWalkCoords.length > 0) {
-    data.walks.push({
-      id: Date.now(),
-      startTime: currentWalkCoords[0].timestamp,
-      endTime: currentWalkCoords[currentWalkCoords.length - 1].timestamp,
-      path: currentWalkCoords
-    });
-    saveData(data);
-    updateStats();
-  }
-  statusMsg('Walk stopped and saved.');
+function endWalk(){
+  if(!isWalking){setStatus('No walk is currently in progress.');return;}
+  isWalking=false;if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
+  if(currentWalkCoords.length){
+    const startTime=currentWalkCoords[0].timestamp,endTime=currentWalkCoords[currentWalkCoords.length-1].timestamp;
+    data.walks.push({id:currentWalkId,startTime,endTime,path:currentWalkCoords});
+    saveData();renderExistingData();toast(`Walk saved · ${fmtDistance(pathDistance(currentWalkCoords))}`);
+  }else setStatus('Walk ended; no GPS points were recorded.');
+  currentWalkCoords=[];currentWalkId=null;
+  $('walkBadge').textContent='READY';$('walkBadge').classList.remove('live');
+  $('walkStatus').textContent='Not walking';$('startBtn').disabled=false;$('stopBtn').disabled=true;
+  if(data.walks.length)setStatus('Walk stopped and saved.');
 }
-
-/* ================= PEE BUTTON ================= */
-function logPeeEvent() {
-  return new Promise((resolve, reject) => {
-    statusMsg('Getting location for pee...');
-    navigator.geolocation.getCurrentPosition(pos => {
-      const { latitude, longitude, accuracy } = pos.coords;
-      const peeEvent = { lat: latitude, lng: longitude, timestamp: Date.now(), accuracy };
-      data.pees.push(peeEvent);
-      saveData(data);
-      L.circleMarker([latitude, longitude], { radius: 8, color: 'orange', fillColor: '#f9a825', fillOpacity: 1 })
-        .bindPopup(`Pee at ${new Date(peeEvent.timestamp).toLocaleString()}`)
-        .addTo(peeMarkersLayer).openPopup();
-      statusMsg(`Pee logged! (±${Math.round(accuracy)}m accuracy)`);
-      updateStats();
-      if (heatVisible) refreshHeatmap();
-      resolve();
-    }, err => {
-      statusMsg('Could not get location for pee: ' + err.message);
-      reject(err);
-    }, { enableHighAccuracy: true, timeout: 10000 });
+function logPeeEvent(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation){setStatus('Geolocation is not supported.');reject(new Error('Geolocation unavailable'));return;}
+    setStatus('Getting GPS location for pee…');
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const{latitude,longitude,accuracy}=pos.coords;
+      const peeEvent={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy,walkId:currentWalkId};
+      data.pees.push(peeEvent);saveData();
+      L.circleMarker([latitude,longitude],{radius:8,color:'#fff',weight:2,fillColor:'#f2a900',fillOpacity:1}).bindPopup(`Pee logged<br>${new Date(peeEvent.timestamp).toLocaleString()}<br>GPS accuracy: ±${Math.round(accuracy)}m`).addTo(peeMarkersLayer).openPopup();
+      if(heatVisible)refreshHeatmap();updateStats();setStatus(`Pee logged · GPS accuracy ±${Math.round(accuracy)}m`);toast('Pee location saved');resolve();
+    },err=>{setStatus('Could not get location: '+err.message);reject(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   });
 }
-  
-/* ================= HEATMAP ================= */
-function refreshHeatmap() {
-  if (heatLayer) map.removeLayer(heatLayer);
-  const points = data.pees.map(p => [p.lat, p.lng, 0.6]);
-  heatLayer = L.heatLayer(points, { radius: 30, blur: 25, maxZoom: 18 });
-  if (heatVisible) heatLayer.addTo(map);
+$('startBtn').addEventListener('click',startWalk);
+$('stopBtn').addEventListener('click',endWalk);
+$('peeBtn').addEventListener('click',()=>logPeeEvent().catch(()=>{}));
+function toggleHeatmap(){
+  heatVisible=!heatVisible;
+  if(heatVisible){walkPathsLayer.remove();peeMarkersLayer.remove();refreshHeatmap();}
+  else{if(heatLayer)map.removeLayer(heatLayer);walkPathsLayer.addTo(map);peeMarkersLayer.addTo(map);}
+  updateStats();setStatus(heatVisible?'Heatmap view on':'Individual markers and routes shown');
 }
+$('heatBtn').addEventListener('click',toggleHeatmap);
+$('mapLayerBtn').addEventListener('click',toggleHeatmap);
+$('locateBtn').addEventListener('click',centerOnMe);
+$('detailsBtn').addEventListener('click',()=>{$('insightDetails').classList.toggle('open');$('detailsBtn').textContent=$('insightDetails').classList.contains('open')?'Hide details ⌃':'View details ›';});
 
-document.getElementById('heatBtn').addEventListener('click', () => {
-  heatVisible = !heatVisible;
-  if (heatVisible) {
-    refreshHeatmap();
-    peeMarkersLayer.remove();
-    walkPathsLayer.remove();
-    statusMsg('Heatmap view ON');
-  } else {
-    if (heatLayer) map.removeLayer(heatLayer);
-    peeMarkersLayer.addTo(map);
-    walkPathsLayer.addTo(map);
-    statusMsg('Heatmap view OFF');
+$('exportBtn').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=`pee-tracker-export-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Data export downloaded');
+});
+$('clearBtn').addEventListener('click',()=>{
+  if(confirm('Delete ALL walks and pee data from this device? This cannot be undone.')){
+    data={walks:[],pees:[]};saveData();renderExistingData();map.closePopup();setStatus('All records cleared.');toast('All data cleared');
   }
 });
 
-/* ================= EXPORT / CLEAR ================= */
-document.getElementById('exportBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `pee-tracker-export-${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  statusMsg('Data exported');
-});
-
-document.getElementById('clearBtn').addEventListener('click', () => {
-  if (confirm('Delete ALL walks and pee data? This cannot be undone.')) {
-    data = { walks: [], pees: [] };
-    saveData(data);
-    renderExistingData();
-    if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
-    statusMsg('All data cleared.');
-  }
-});
-
-/* ================= TILE CACHING (5-mile offline area) ================= */
-const CACHE_NAME = 'pee-tracker-tiles-v1';
-const MILES_TO_METERS = 1609.34;
-const CACHE_RADIUS_MILES = 5;
-const CACHE_ZOOM_LEVELS = [14, 15, 16, 17];
-
-function lonLatToTile(lat, lon, zoom) {
-  const n = Math.pow(2, zoom);
-  const x = Math.floor((lon + 180) / 360 * n);
-  const latRad = lat * Math.PI / 180;
-  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
-  return { x, y };
-}
-
-function metersToDegreesLat(meters) {
-  return meters / 111320;
-}
-function metersToDegreesLon(meters, atLat) {
-  return meters / (111320 * Math.cos(atLat * Math.PI / 180));
-}
-
-function buildTileList(centerLat, centerLon, radiusMiles, zoomLevels) {
-  const radiusMeters = radiusMiles * MILES_TO_METERS;
-  const dLat = metersToDegreesLat(radiusMeters);
-  const dLon = metersToDegreesLon(radiusMeters, centerLat);
-
-  const minLat = centerLat - dLat;
-  const maxLat = centerLat + dLat;
-  const minLon = centerLon - dLon;
-  const maxLon = centerLon + dLon;
-
-  const tiles = [];
-  zoomLevels.forEach(z => {
-    const topLeft = lonLatToTile(maxLat, minLon, z);
-    const bottomRight = lonLatToTile(minLat, maxLon, z);
-
-    const minX = Math.min(topLeft.x, bottomRight.x);
-    const maxX = Math.max(topLeft.x, bottomRight.x);
-    const minY = Math.min(topLeft.y, bottomRight.y);
-    const maxY = Math.max(topLeft.y, bottomRight.y);
-
-    for (let x = minX; x <= maxX; x++) {
-      for (let y = minY; y <= maxY; y++) {
-        tiles.push({ z, x, y });
-      }
-    }
-  });
+/* Retains the original 5-mile tile-cache workflow. */
+const CACHE_NAME='pee-tracker-tiles-v1',MILES_TO_METERS=1609.34,CACHE_RADIUS_MILES=5,CACHE_ZOOM_LEVELS=[14,15,16,17],TILE_SUBDOMAINS=['a','b','c'];
+function lonLatToTile(lat,lon,z){const n=2**z,x=Math.floor((lon+180)/360*n),latRad=lat*Math.PI/180,y=Math.floor((1-Math.log(Math.tan(latRad)+1/Math.cos(latRad))/Math.PI)/2*n);return{x,y};}
+function metersToDegreesLat(m){return m/111320;}
+function metersToDegreesLon(m,lat){return m/(111320*Math.cos(lat*Math.PI/180));}
+function buildTileList(lat,lon,radiusMiles,zooms){
+  const r=radiusMiles*MILES_TO_METERS,dLat=metersToDegreesLat(r),dLon=metersToDegreesLon(r,lat),tiles=[];
+  zooms.forEach(z=>{const a=lonLatToTile(lat+dLat,lon-dLon,z),b=lonLatToTile(lat-dLat,lon+dLon,z);for(let x=Math.min(a.x,b.x);x<=Math.max(a.x,b.x);x++)for(let y=Math.min(a.y,b.y);y<=Math.max(a.y,b.y);y++)tiles.push({z,x,y});});
   return tiles;
 }
-
-async function cacheTiles(centerLat, centerLon) {
-  const tiles = buildTileList(centerLat, centerLon, CACHE_RADIUS_MILES, CACHE_ZOOM_LEVELS);
-  const total = tiles.length;
-
-  if (total > 6000) {
-    const proceed = confirm(`This will download ${total} map tiles, which may take a while and use noticeable data. Continue?`);
-    if (!proceed) { statusMsg('Caching cancelled.'); return; }
+async function cacheTiles(lat,lon){
+  const tiles=buildTileList(lat,lon,CACHE_RADIUS_MILES,CACHE_ZOOM_LEVELS),bar=$('cacheBar');if(tiles.length>6000&&!confirm(`This will request ${tiles.length} map tiles and use data. Continue?`))return;
+  let cache;try{cache=await caches.open(CACHE_NAME);}catch(e){setStatus('Browser cache storage is unavailable.');return;}
+  bar.style.display='block';bar.max=tiles.length;bar.value=0;let done=0,failed=0;
+  for(const t of tiles){const sub=TILE_SUBDOMAINS[(t.x+t.y)%3],url=`https://${sub}.tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`;
+    try{if(!await cache.match(url)){const response=await fetch(url,{mode:'cors'});if(response.ok)await cache.put(url,response);else failed++;}}catch(e){failed++;}
+    done++;bar.value=done;$('cacheProgress').textContent=`Caching map tiles: ${done}/${tiles.length}${failed?` · ${failed} failed`:''}`;
+    if(done%20===0)await new Promise(r=>setTimeout(r,60));
   }
-
-  const cache = await caches.open(CACHE_NAME);
-  const bar = document.getElementById('cacheBar');
-  bar.style.display = 'block';
-  bar.max = total;
-  bar.value = 0;
-
-  let done = 0;
-  let failed = 0;
-
-  for (const t of tiles) {
-    const sub = TILE_SUBDOMAINS[(t.x + t.y) % TILE_SUBDOMAINS.length];
-    const url = `https://${sub}.tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`;
-    try {
-      const existing = await cache.match(url);
-      if (!existing) {
-        const response = await fetch(url, { mode: 'cors' });
-        if (response.ok) {
-          await cache.put(url, response);
-        } else {
-          failed++;
-        }
-      }
-    } catch (e) {
-      failed++;
-    }
-    done++;
-    bar.value = done;
-    document.getElementById('cacheProgress').textContent =
-      `Caching tiles: ${done}/${total}${failed ? ' (' + failed + ' failed)' : ''}`;
-    // Small delay to avoid hammering the tile server
-    if (done % 20 === 0) await new Promise(r => setTimeout(r, 50));
-  }
-
-  document.getElementById('cacheProgress').textContent =
-    `Done! ${done - failed}/${total} tiles cached for offline use.`;
-  statusMsg('Map area cached for offline use.');
+  $('cacheProgress').textContent=`Finished · ${done-failed}/${tiles.length} tiles cached. Browser and map-provider limits may affect offline use.`;
+  setStatus('Map tile caching finished.');
 }
-
-document.getElementById('cacheBtn').addEventListener('click', () => {
-  if (!('caches' in window)) {
-    statusMsg('Offline caching not supported in this browser.');
-    return;
-  }
-  statusMsg('Getting your location to begin caching...');
-  navigator.geolocation.getCurrentPosition(pos => {
-    const { latitude, longitude } = pos.coords;
-    statusMsg('Starting tile download...');
-    cacheTiles(latitude, longitude);
-  }, err => {
-    statusMsg('Could not get location: ' + err.message);
-  }, { enableHighAccuracy: true, timeout: 15000 });
+$('cacheBtn').addEventListener('click',()=>{
+  if(!('caches'in window)||!navigator.geolocation){setStatus('Caching or location is not supported by this browser.');return;}
+  setStatus('Getting location for 5-mile map cache…');
+  navigator.geolocation.getCurrentPosition(pos=>cacheTiles(pos.coords.latitude,pos.coords.longitude),err=>setStatus('Could not get location: '+err.message),{enableHighAccuracy:true,timeout:15000});
 });
-
-/* ================= SERVICE WORKER FOR OFFLINE TILE SERVING ================= */
-if ('serviceWorker' in navigator) {
-  const swCode = `
-    const CACHE_NAME = '${CACHE_NAME}';
-    self.addEventListener('fetch', event => {
-      const url = event.request.url;
-      if (url.includes('tile.openstreetmap.org')) {
-        event.respondWith(
-          caches.open(CACHE_NAME).then(cache => {
-            return cache.match(event.request).then(cached => {
-              if (cached) return cached;
-              return fetch(event.request).then(response => {
-                if (response.ok) cache.put(event.request, response.clone());
-                return response;
-              }).catch(() => cached);
-            });
-          })
-        );
-      }
-    });
-  `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-  navigator.serviceWorker.register(swUrl).catch(e => {
-    console.log('Service worker registration failed:', e);
-  });
-}
-
-
-  const actionToast = document.getElementById('actionToast');
-
-function withFeedback(btn, options) {
-  return function (...args) {
-    btn.classList.add('btn-active');
-    actionToast.textContent = options.pendingText;
-    actionToast.classList.remove('error');
-    actionToast.classList.add('show');
-
-    let result;
-    try {
-      result = options.fn(...args);
-    } catch (err) {
-      showResult(false, err);
-      return;
-    }
-
-    if (result && typeof result.then === 'function') {
-      result.then(() => showResult(true))
-            .catch((err) => showResult(false, err));
-    } else {
-      showResult(true);
-    }
-
-    function showResult(ok, err) {
-      actionToast.textContent = ok ? options.successText : '⚠ Failed — try again';
-      if (!ok) {
-        actionToast.classList.add('error');
-        console.error(err);
-      }
-      setTimeout(() => {
-        btn.classList.remove('btn-active');
-        actionToast.classList.remove('show');
-      }, 1200);
-    }
-  };
-}
-
-const startBtn = document.getElementById('startBtn');
-const stopBtn  = document.getElementById('stopBtn');
-const peeBtn   = document.getElementById('peeBtn');
-
-startBtn.addEventListener('click', withFeedback(startBtn, {
-  pendingText: '▶ Starting walk...',
-  successText: '✔ Walk started!',
-  fn: startWalk
-}));
-
-stopBtn.addEventListener('click', withFeedback(stopBtn, {
-  pendingText: '⏹ Ending walk...',
-  successText: '✔ Walk ended!',
-  fn: endWalk
-}));
-
-peeBtn.addEventListener('click', withFeedback(peeBtn, {
-  pendingText: '💦 Logging...',
-  successText: '✔ Pee logged!',
-  fn: logPeeEvent
-}));
-
+window.addEventListener('resize',()=>map.invalidateSize());
 </script>
-
-  <div id="toast"></div>
-  
 </body>
 </html>
