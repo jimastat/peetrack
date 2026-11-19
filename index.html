@@ -2,8 +2,9 @@
 <html lang="en">
 
 <head>
-<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=4">
-<link rel="icon" type="image/png" href="./apple-touch-icon.png?v=4">
+<link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=5">
+<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=5">
+<link rel="manifest" href="./manifest.webmanifest?v=5">
   
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -186,6 +187,8 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
     <div class="utility-grid">
       <button class="utility" id="viewDataBtn"><span class="ico">☷</span>View all data</button>
       <button class="utility" id="exportBtn"><span class="ico">↥</span>Export data</button>
+      <button class="utility" id="importBtn"><span class="ico">↧</span>Import data</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
@@ -458,6 +461,34 @@ $('detailsBtn').addEventListener('click',()=>{$('insightDetails').classList.togg
 $('exportBtn').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=`pee-tracker-export-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);toast('Data export downloaded');
+});
+// Import from an exported JSON backup. Merge safely without duplicating matching records.
+$('importBtn').addEventListener('click',()=>{$('importFile').value='';$('importFile').click();});
+$('importFile').addEventListener('change',async event=>{
+  const file=event.target.files?.[0];
+  if(!file)return;
+  try{
+    const incoming=JSON.parse(await file.text());
+    if(!incoming || typeof incoming!=='object' || !Array.isArray(incoming.walks) || !Array.isArray(incoming.pees)){
+      throw new Error('This is not a Pee Tracker export (walks and pees arrays are required).');
+    }
+    const validPee=p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)&&Math.abs(p.lat)<=90&&Math.abs(p.lng)<=180&&Number.isFinite(p.timestamp);
+    const validWalk=w=>w&&typeof w==='object'&&Array.isArray(w.path)&&w.path.every(pt=>pt&&Number.isFinite(pt.lat)&&Number.isFinite(pt.lng)&&Math.abs(pt.lat)<=90&&Math.abs(pt.lng)<=180);
+    if(!incoming.pees.every(validPee)||!incoming.walks.every(validWalk))throw new Error('The backup contains invalid location records.');
+    const fingerprint=obj=>JSON.stringify(obj);
+    const peeKeys=new Set(data.pees.map(fingerprint));
+    const walkKeys=new Set(data.walks.map(fingerprint));
+    const newPees=incoming.pees.filter(p=>!peeKeys.has(fingerprint(p)) && (peeKeys.add(fingerprint(p)),true));
+    const newWalks=incoming.walks.filter(w=>!walkKeys.has(fingerprint(w)) && (walkKeys.add(fingerprint(w)),true));
+    if(!newPees.length&&!newWalks.length){toast('All backup records already present');return;}
+    if(!confirm(`Import ${newPees.length} pee events and ${newWalks.length} walks? Existing records will be kept.`))return;
+    const merged={walks:[...data.walks,...newWalks],pees:[...data.pees,...newPees]};
+    localStorage.setItem(STORE_KEY,JSON.stringify(merged));
+    data=merged;
+    renderExistingData();map.closePopup();
+    setStatus(`Imported ${newPees.length} pee events and ${newWalks.length} walks.`);
+    toast('Backup imported successfully');
+  }catch(error){alert('Import failed: '+error.message);console.error('Import failed',error);}
 });
 $('clearBtn').addEventListener('click',()=>{
   if(confirm('Delete ALL walks and pee data from this device? This cannot be undone.')){
