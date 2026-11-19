@@ -99,7 +99,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
 .data-sheet-head h2{margin:0 0 4px;font-size:19px}.data-sheet-head small{color:#66738a}
 .data-sheet-head button{background:#f0f3f8;border:0;border-radius:10px;padding:9px 12px;font-size:16px}
 .data-tools{display:flex;gap:8px;padding:12px;border-bottom:1px solid #e5eaf1}
-.data-tools input{flex:1;min-width:0}.data-tools input,.data-tools select{border:1px solid #d7e0eb;border-radius:10px;padding:10px 8px;background:white;font-size:13px}
+.data-tools input{flex:1;min-width:0;font-size:16px}.data-tools input,.data-tools select{border:1px solid #d7e0eb;border-radius:10px;padding:10px 8px;background:white;font-size:13px}
 .data-list{overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain}
 .data-record{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid #e9edf3}
 .data-record-info{flex:1;min-width:0}.data-record-info strong{display:block;font-size:13px}.data-record-info small{display:block;font-size:11px;color:#68768b;margin-top:4px;overflow-wrap:anywhere}
@@ -498,7 +498,7 @@ function renderDataList(){
     row.append(locate,del);frag.appendChild(row);
   });root.appendChild(frag);
 }
-function openDataList(){dataOverlay.hidden=false;document.body.style.overflow='hidden';renderDataList();$('dataSearch').focus();}
+function openDataList(){dataOverlay.hidden=false;document.body.style.overflow='hidden';renderDataList();}
 function closeDataList(){dataOverlay.hidden=true;document.body.style.overflow='';}
 $('viewDataBtn').addEventListener('click',openDataList);
 $('closeDataBtn').addEventListener('click',closeDataList);
