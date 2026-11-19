@@ -47,10 +47,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .action:active,.utility:active{transform:scale(.98);filter:brightness(.96)}
 #startBtn{background:linear-gradient(135deg,#399c4b,#237332)}
 #stopBtn{background:linear-gradient(135deg,#e14b43,#b92327)}
-.haptic-wrap{position:relative;min-width:0}
-.haptic-wrap .action{width:100%}
-#peeWrap{grid-column:1/-1}
-#peeBtn{width:100%;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
+#peeBtn{grid-column:1/-1;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
 #undoPeeBtn{grid-column:1/-1;min-height:43px;background:#eef2f8;color:#36475f;border:1px solid #d7e0eb;box-shadow:none;font-size:13px}
 .action:disabled{opacity:.42;cursor:not-allowed}
 .status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
@@ -153,9 +150,9 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
   <section class="panel">
     <div class="section-head"><h2>🐾 Take action</h2><small id="walkStatus">Not walking</small></div>
     <div class="action-grid">
-      <div class="haptic-wrap"><button class="action" id="startBtn">▶ &nbsp;Start walk</button><input id="startHapticSwitch" type="checkbox" switch aria-label="Start walk" style="display:none"></div>
-      <div class="haptic-wrap"><button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button><input id="stopHapticSwitch" type="checkbox" switch aria-label="Stop walk" style="display:none" disabled></div>
-      <div id="peeWrap"><button class="action" id="peeBtn">💧 &nbsp;Log a pee</button><input id="peeHapticSwitch" type="checkbox" switch aria-label="Log a pee" style="display:none"></div>
+      <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
+      <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
+      <button class="action" id="peeBtn">💧 &nbsp;Log a pee</button>
       <button class="action" id="undoPeeBtn" disabled>↶ &nbsp;Undo last pee</button>
     </div>
     <div class="status-line" id="status">Ready when you are</div>
@@ -378,7 +375,6 @@ function startWalk(){
   walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
   $('walkBadge').textContent='WALK IN PROGRESS';$('walkBadge').classList.add('live');
   $('walkStatus').textContent='Tracking';$('startBtn').disabled=true;$('stopBtn').disabled=false;
-  $('startHapticSwitch').disabled=true;$('stopHapticSwitch').disabled=false;
   setStatus('Starting GPS tracking…');
   watchId=navigator.geolocation.watchPosition(pos=>{
     const{latitude,longitude,accuracy}=pos.coords;
@@ -402,7 +398,6 @@ function endWalk(){
   currentWalkCoords=[];currentWalkId=null;
   $('walkBadge').textContent='READY';$('walkBadge').classList.remove('live');
   $('walkStatus').textContent='Not walking';$('startBtn').disabled=false;$('stopBtn').disabled=true;
-  $('startHapticSwitch').disabled=false;$('stopHapticSwitch').disabled=true;
   if(data.walks.length)setStatus('Walk stopped and saved.');
 }
 function logPeeEvent(){
@@ -420,25 +415,7 @@ function logPeeEvent(){
 }
 $('startBtn').addEventListener('click',startWalk);
 $('stopBtn').addEventListener('click',endWalk);
-// On supported iOS Safari versions, touching a native switch produces one short haptic.
-// The transparent switches handle touch; ordinary buttons remain available elsewhere.
-const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-const hapticActions=[
-  ['startHapticSwitch',startWalk],
-  ['stopHapticSwitch',endWalk],
-  ['peeHapticSwitch',()=>logPeeEvent().catch(()=>{})]
-];
-if(isIOS){
-  hapticActions.forEach(([id,action])=>{
-    const input=$(id);
-    input.style.cssText='display:block;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0.01;z-index:2;cursor:pointer';
-    input.addEventListener('change',action);
-  });
-}
-$('peeBtn').addEventListener('click',()=>{
-  if(navigator.vibrate)navigator.vibrate(25);
-  logPeeEvent().catch(()=>{});
-});
+$('peeBtn').addEventListener('click',()=>logPeeEvent().catch(()=>{}));
 $('undoPeeBtn').addEventListener('click',()=>{
   if(!data.pees.length)return;
   data.pees.pop();saveData();map.closePopup();renderExistingData();
