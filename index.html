@@ -69,6 +69,12 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 #mapFilters{display:flex;gap:4px;align-items:center;flex-wrap:nowrap;min-width:0}
 #mapFilters button{border:1px solid #d7e0eb;border-radius:10px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:9px 8px;white-space:nowrap}
 #mapFilters button.active{background:#1769e8;color:white;border-color:#1769e8}
+#routeSelector{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid #e4eaf2}
+#routeSelector .route-label{font-size:12px;font-weight:750;color:#35465d;white-space:nowrap}
+#routeModes{display:flex;gap:4px;align-items:center}
+#routeModes button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:8px 11px;min-height:34px}
+#routeModes button.active{background:#1769e8;color:white;border-color:#1769e8}
+@media(max-width:420px){#routeModes button{padding:7px 9px;font-size:10px}}
 .cluster-icon{background:transparent;border:0}
 .cluster-bubble{display:flex;align-items:center;justify-content:center;border:3px solid white;border-radius:50%;background:#e9a51c;color:#172235;font-weight:850;font-size:14px;box-shadow:0 2px 9px #17223566;width:100%;height:100%}
 .cluster-bubble.many{background:#d96c23;color:white}
@@ -108,6 +114,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
   <section class="panel history-panel" aria-label="Map time filters">
     <div class="section-head"><h2>📍 Map history</h2>
     <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
+    <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
   </section>
 
   <section class="panel">
@@ -174,7 +181,7 @@ let data=loadData();
 
 const map=L.map('map',{tap:true,zoomControl:true}).setView([45.5231,-122.6765],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
-let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all";
+let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const $=id=>document.getElementById(id);
 function setStatus(msg){$('status').textContent=msg;}
@@ -232,11 +239,37 @@ function renderPeeMarkers(){
     }
   });
 }
-function renderExistingData(){
+function walkStart(w){
+  const t=Number(w.startTime??w.id??w.path?.[0]?.timestamp);
+  return Number.isFinite(t)?t:NaN;
+}
+function routePeriodStart(){
+  if(selectedPeriod==='all')return -Infinity;
+  const now=new Date(),start=new Date(now);
+  if(selectedPeriod==='today')start.setHours(0,0,0,0);
+  else start.setTime(now.getTime()-(selectedPeriod==='week'?7:30)*86400000);
+  return start.getTime();
+}
+function renderWalkRoutes(){
   walkPathsLayer.clearLayers();
-  data.walks.forEach(w=>{if(w.path&&w.path.length>1)L.polyline(w.path.map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.55}).addTo(walkPathsLayer);});
+  const indexed=data.walks.map((walk,index)=>({walk,index})).filter(x=>Array.isArray(x.walk.path)&&x.walk.path.length>1);
+  const latest=indexed.reduce((best,x)=>!best||((walkStart(x.walk)||0)>(walkStart(best.walk)||0))?x:best,null);
+  if(routeMode==='latest'&&latest){
+    L.polyline(latest.walk.path.map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.85}).addTo(walkPathsLayer);
+  }else if(routeMode==='filtered'){
+    const start=routePeriodStart();
+    indexed.forEach(x=>{
+      const t=walkStart(x.walk);
+      if(start!==-Infinity&&(!Number.isFinite(t)||t<start))return;
+      L.polyline(x.walk.path.map(p=>[p.lat,p.lng]),{color:'#808b9b',weight:2,opacity:.28}).addTo(walkPathsLayer);
+    });
+  }
+  if(!map.hasLayer(walkPathsLayer))walkPathsLayer.addTo(map);
+}
+function renderExistingData(){
+  renderWalkRoutes();
   renderPeeMarkers();refreshHeatmap();
-  if(heatVisible){peeMarkersLayer.remove();walkPathsLayer.remove();}
+  if(heatVisible)peeMarkersLayer.remove();
   updateStats();
 }
 function refreshHeatmap(){
@@ -324,6 +357,7 @@ function endWalk(){
     data.walks.push({id:currentWalkId,startTime,endTime,path:currentWalkCoords});
     saveData();renderExistingData();toast(`Walk saved · ${fmtDistance(pathDistance(currentWalkCoords))}`);
   }else setStatus('Walk ended; no GPS points were recorded.');
+  if(walkPolyline){map.removeLayer(walkPolyline);walkPolyline=null;}
   currentWalkCoords=[];currentWalkId=null;
   $('walkBadge').textContent='READY';$('walkBadge').classList.remove('live');
   $('walkStatus').textContent='Not walking';$('startBtn').disabled=false;$('stopBtn').disabled=true;
@@ -366,14 +400,21 @@ $('mapFilters').addEventListener('click',event=>{
   const button=event.target.closest('button[data-period]');if(!button)return;
   selectedPeriod=button.dataset.period;
   $('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b===button));
-  map.closePopup();renderPeeMarkers();refreshHeatmap();updateStats();
+  map.closePopup();renderPeeMarkers();refreshHeatmap();renderWalkRoutes();updateStats();
 });
 
+$('routeModes').addEventListener('click',event=>{
+  const button=event.target.closest('button[data-route]');if(!button)return;
+  routeMode=button.dataset.route;
+  $('routeModes').querySelectorAll('button').forEach(b=>{const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+  renderWalkRoutes();
+  setStatus(routeMode==='off'?'Saved walk routes hidden.':routeMode==='latest'?'Showing most recent saved walk.':'Showing historical routes for the selected period.');
+});
 function toggleHeatmap(){
   heatVisible=!heatVisible;
-  if(heatVisible){walkPathsLayer.remove();peeMarkersLayer.remove();refreshHeatmap();}
-  else{if(heatLayer)map.removeLayer(heatLayer);walkPathsLayer.addTo(map);peeMarkersLayer.addTo(map);}
-  updateStats();setStatus(heatVisible?'Heatmap view on':'Grouped markers and routes shown');
+  if(heatVisible){peeMarkersLayer.remove();refreshHeatmap();}
+  else{if(heatLayer)map.removeLayer(heatLayer);peeMarkersLayer.addTo(map);}
+  updateStats();setStatus(heatVisible?'Heatmap view on':'Grouped pee markers shown');
 }
 $('heatBtn').addEventListener('click',toggleHeatmap);
 $('mapLayerBtn').addEventListener('click',toggleHeatmap);
