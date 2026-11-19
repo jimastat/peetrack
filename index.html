@@ -47,7 +47,8 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .action:active,.utility:active{transform:scale(.98);filter:brightness(.96)}
 #startBtn{background:linear-gradient(135deg,#399c4b,#237332)}
 #stopBtn{background:linear-gradient(135deg,#e14b43,#b92327)}
-#peeBtn{grid-column:1/-1;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
+#peeWrap{grid-column:1/-1;position:relative}
+#peeBtn{width:100%;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
 #undoPeeBtn{grid-column:1/-1;min-height:43px;background:#eef2f8;color:#36475f;border:1px solid #d7e0eb;box-shadow:none;font-size:13px}
 .action:disabled{opacity:.42;cursor:not-allowed}
 .status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
@@ -152,7 +153,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
     <div class="action-grid">
       <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
       <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
-      <button class="action" id="peeBtn">💧 &nbsp;Log a pee</button>
+      <div id="peeWrap"><button class="action" id="peeBtn">💧 &nbsp;Log a pee</button><input id="peeHapticSwitch" type="checkbox" switch aria-label="Log a pee" style="display:none"></div>
       <button class="action" id="undoPeeBtn" disabled>↶ &nbsp;Undo last pee</button>
     </div>
     <div class="status-line" id="status">Ready when you are</div>
@@ -415,7 +416,18 @@ function logPeeEvent(){
 }
 $('startBtn').addEventListener('click',startWalk);
 $('stopBtn').addEventListener('click',endWalk);
-$('peeBtn').addEventListener('click',()=>logPeeEvent().catch(()=>{}));
+// A short native-switch haptic is available on some iOS Safari versions.
+// The transparent switch receives the actual touch; synthetic clicks do not reliably vibrate.
+const peeSwitch=$('peeHapticSwitch');
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+if(isIOS){
+  peeSwitch.style.cssText='display:block;position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0.01;z-index:2;cursor:pointer';
+  peeSwitch.addEventListener('change',()=>logPeeEvent().catch(()=>{}));
+}
+$('peeBtn').addEventListener('click',()=>{
+  if(navigator.vibrate)navigator.vibrate(25);
+  logPeeEvent().catch(()=>{});
+});
 $('undoPeeBtn').addEventListener('click',()=>{
   if(!data.pees.length)return;
   data.pees.pop();saveData();map.closePopup();renderExistingData();
