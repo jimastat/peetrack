@@ -52,12 +52,11 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .action:disabled{opacity:.42;cursor:not-allowed}
 .status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
 .stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-.stat{text-align:center;padding:12px 5px;background:#f4f6fa;border-radius:13px;min-width:0}
+.stat{text-align:left;padding:9px 11px;background:#f4f6fa;border-radius:13px;min-width:0}
 .stat:last-child{border:0}
 .stat .value{font-size:20px;font-weight:850;line-height:1.2;white-space:nowrap}
-.stat .label{font-size:12px;color:var(--muted);margin-top:4px}
-.stat .symbol{font-size:18px;margin-bottom:4px}
-.insight-callout{margin-top:12px;padding:11px 12px;border-radius:13px;background:#eef6e9;color:#315e28;font-size:13px;line-height:1.4}
+.stat .label{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.25}
+.stat .symbol{font-size:19px;line-height:1;flex:0 0 auto}.stat .stat-top{display:flex;align-items:center;gap:8px;min-width:0}
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
 .detail{background:#f4f6fa;border-radius:13px;padding:11px}
 .detail strong{display:block;font-size:16px;margin-bottom:3px}
@@ -170,14 +169,13 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button type="button" data-insight-period="all">All Time</button>
     </div>
     <div class="stats-grid">
-      <div class="stat"><div class="symbol">💧</div><div class="value" id="insightPees">0</div><div class="label">Pee Events</div></div>
-      <div class="stat"><div class="symbol">🐾</div><div class="value" id="insightWalks">0</div><div class="label">Total Walks</div></div>
-      <div class="stat"><div class="symbol">📍</div><div class="value" id="insightDistance">0.0 mi</div><div class="label">Distance Walked</div></div>
-      <div class="stat"><div class="symbol">🚶</div><div class="value" id="insightAvgDistance">—</div><div class="label">Average Walk</div></div>
-      <div class="stat"><div class="symbol">⏱️</div><div class="value" id="insightAvgDuration">—</div><div class="label">Average Walk Duration</div></div>
-      <div class="stat"><div class="symbol">💧</div><div class="value" id="insightPeesPerWalk">—</div><div class="label">Pees per Walk</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">💧</div><div class="value" id="insightPees">0</div></div><div class="label">Pee Events</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">🐾</div><div class="value" id="insightWalks">0</div></div><div class="label">Total Walks</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">📍</div><div class="value" id="insightDistance">0.0 mi</div></div><div class="label">Distance Walked</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">🚶</div><div class="value" id="insightAvgDistance">—</div></div><div class="label">Average Walk</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">⏱️</div><div class="value" id="insightAvgDuration">—</div></div><div class="label">Average Walk Duration</div></div>
+      <div class="stat"><div class="stat-top"><div class="symbol">💧</div><div class="value" id="insightPeesPerWalk">—</div></div><div class="label">Pees per Walk</div></div>
     </div>
-    <div class="insight-callout" id="insightCallout">Your walking and pee statistics for the selected period.</div>
     <div id="insightDetails">
       <div class="detail-grid">
         <div class="detail"><strong id="insightLongestDistance">—</strong><span>Longest walk</span></div>
@@ -203,7 +201,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.1</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.2</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -400,7 +398,6 @@ function updateInsights(){
   const list=$('favoriteList');list.innerHTML='';
   if(!clusters.length)list.innerHTML='<li>Not enough location data yet</li>';
   else clusters.slice(0,5).forEach((c,i)=>{const li=document.createElement('li');const btn=document.createElement('button');btn.type='button';btn.className='favorite-area';btn.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'} ↗</b>`;btn.addEventListener('click',()=>showFavoriteArea(c));li.appendChild(btn);list.appendChild(li);});
-  $('insightCallout').textContent=!walks.length&&!pees.length?'No walks or pee events recorded for this period.':`${walks.length} completed ${walks.length===1?'walk':'walks'} and ${pees.length} pee ${pees.length===1?'event':'events'} in this period.`;
   $('insightsPeriods').querySelectorAll('button').forEach(b=>{const active=b.dataset.insightPeriod===insightsPeriod;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
 }
 function showFavoriteArea(cluster){
