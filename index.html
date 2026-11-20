@@ -152,12 +152,16 @@ header{position:relative;padding-right:58px}
 .walk-history-help{font-size:12px;color:#69778a;line-height:1.5;margin:0;padding:12px 17px 8px}
 .walk-history-list{padding:0 12px 12px;overflow-y:auto}
 .walk-history-entry{border:1px solid #e0e7ef;border-radius:12px;padding:13px;margin:8px 0;background:#fff}
-.walk-history-date{font-size:14px;font-weight:800;color:#26384e}
+.walk-history-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.walk-history-date{font-size:14px;font-weight:800;color:#26384e;flex:1;min-width:0;padding-top:5px}
+.walk-history-trash{display:flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;border-radius:10px;border:1px solid #e2e7ed;background:#f6f8fa;color:#667487;cursor:pointer;touch-action:manipulation}
+.walk-history-trash svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.walk-history-trash:focus-visible{outline:3px solid #2675d6;outline-offset:2px}
+.walk-history-trash:disabled{opacity:.4;cursor:not-allowed}
 .walk-history-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:11px 0}
 .walk-history-metric{font-size:12px;color:#5a6879}.walk-history-metric strong{display:block;color:#253c55;font-size:15px;margin-bottom:2px}
-.walk-history-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.walk-history-actions button{border-radius:9px;padding:9px 11px;font-size:12px;font-weight:750;border:1px solid #b9d0eb;background:#eaf3ff;color:#185dba}
-.walk-history-actions button.walk-delete{background:#fff5f4;border-color:#e7b4ae;color:#ad3029}
+.walk-history-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch}
+.walk-history-actions button{min-width:0;white-space:nowrap;border-radius:9px;padding:9px 5px;font-size:12px;font-weight:750;border:1px solid #b9d0eb;background:#eaf3ff;color:#185dba}
 .walk-history-actions button:disabled{border-color:#e0e4ea;background:#f5f6f8;color:#9ba5b2}
 #walkDeleteOverlay{z-index:11000}
 .walk-delete-sheet{max-width:440px}
@@ -269,7 +273,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.4</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.6</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -958,7 +962,14 @@ function renderWalkHistory(){
     const date=document.createElement('div');date.className='walk-history-date';
     const start=walkStart(walk),end=Number(walk.endTime);
     date.textContent=Number.isFinite(start)?new Date(start).toLocaleString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'Undated walk';
-    card.appendChild(date);
+    const heading=document.createElement('div');heading.className='walk-history-heading';
+    heading.appendChild(date);
+    const del=document.createElement('button');del.type='button';del.className='walk-history-trash';
+    del.setAttribute('aria-label','Delete walk');del.title=isWalking?'Stop recording before deleting a walk':'Delete walk';
+    del.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v7m4-7v7"/></svg>';
+    del.disabled=isWalking;
+    del.addEventListener('click',()=>requestWalkDeletion(index));
+    heading.appendChild(del);card.appendChild(heading);
     const distance=pathDistance(Array.isArray(walk.path)?walk.path:[]);
     const duration=Number.isFinite(start)&&Number.isFinite(end)&&end>=start?fmtDuration(end-start):'—';
     const metrics=document.createElement('div');metrics.className='walk-history-metrics';
@@ -966,15 +977,12 @@ function renderWalkHistory(){
     vals.forEach(([label,value])=>{const item=document.createElement('div');item.className='walk-history-metric';const strong=document.createElement('strong');strong.textContent=value;const name=document.createElement('span');name.textContent=label;item.append(strong,name);metrics.appendChild(item);});
     card.appendChild(metrics);
     const actions=document.createElement('div');actions.className='walk-history-actions';
-    const view=document.createElement('button');view.type='button';view.textContent='🗺 View on map';
+    const view=document.createElement('button');view.type='button';view.textContent='🗺 View Walk';
     const path=Array.isArray(walk.path)?walk.path.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)):[];
     view.disabled=path.length===0;
     view.addEventListener('click',()=>showHistoryWalk(index));
-    const repair=document.createElement('button');repair.type='button';repair.textContent='GPS review · Coming soon';repair.disabled=true;
-    const del=document.createElement('button');del.type='button';del.className='walk-delete';del.textContent='🗑 Delete Walk';
-    del.disabled=isWalking;del.title=isWalking?'Stop recording before deleting a walk':'';
-    del.addEventListener('click',()=>requestWalkDeletion(index));
-    actions.append(view,repair,del);card.appendChild(actions);frag.appendChild(card);
+    const repair=document.createElement('button');repair.type='button';repair.textContent='GPS Review';repair.disabled=true;
+    actions.append(view,repair);card.appendChild(actions);frag.appendChild(card);
   });root.appendChild(frag);
 }
 function openWalkHistory(){renderWalkHistory();walkHistoryOverlay.hidden=false;document.body.style.overflow='hidden';}
