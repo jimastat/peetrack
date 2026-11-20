@@ -51,12 +51,12 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 #undoPeeBtn{grid-column:1/-1;min-height:43px;background:#eef2f8;color:#36475f;border:1px solid #d7e0eb;box-shadow:none;font-size:13px}
 .action:disabled{opacity:.42;cursor:not-allowed}
 .status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
-.stat{text-align:center;padding:5px 6px;border-right:1px solid #e3e8ef}
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.stat{text-align:center;padding:12px 5px;background:#f4f6fa;border-radius:13px;min-width:0}
 .stat:last-child{border:0}
-.stat .value{font-size:21px;font-weight:850;line-height:1.2;white-space:nowrap}
-.stat .label{font-size:11px;color:var(--muted);margin-top:4px}
-.stat .symbol{font-size:19px;margin-bottom:4px}
+.stat .value{font-size:20px;font-weight:850;line-height:1.2;white-space:nowrap}
+.stat .label{font-size:12px;color:var(--muted);margin-top:4px}
+.stat .symbol{font-size:18px;margin-bottom:4px}
 .insight-callout{margin-top:12px;padding:11px 12px;border-radius:13px;background:#eef6e9;color:#315e28;font-size:13px;line-height:1.4}
 .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:10px}
 .detail{background:#f4f6fa;border-radius:13px;padding:11px}
@@ -96,10 +96,10 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .visit-delete{border:1px solid #efc4c4;border-radius:8px;background:#fff2f2;color:#a72a2a;padding:6px 9px;font-size:13px}
 #cacheBar{width:100%;height:8px;margin-top:10px;display:none}
 #cacheProgress{font-size:11px;color:var(--muted);text-align:center;margin-top:5px}
-footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
+footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-version{display:block;font-size:10px;margin-top:5px;color:#9ca6b6}.insights-periods{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}.insights-periods button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:8px 10px}.insights-periods button.active{background:#1769e8;color:white;border-color:#1769e8}
 #toast{position:fixed;z-index:2000;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#172235;color:white;border-radius:30px;padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #toast.show{opacity:1}
-@media(max-width:420px){.history-panel{padding:9px 10px}.history-panel .section-head h2{font-size:12px}#mapFilters button{font-size:10px;padding:9px 6px}#app{padding:8px;gap:9px}.panel{padding:13px}.action{font-size:14px;min-height:58px}.stats-grid .value{font-size:18px}.stats-grid .label{font-size:10px}.utility{font-size:10px}.brand h1{font-size:clamp(16px,5.1vw,21px)}.summit-mark{width:34px;height:24px;flex-basis:34px}.stevie-avatar{width:55px;height:55px;flex-basis:55px}header{gap:8px;padding:9px 10px}.brand{padding-left:8px}#walkBadge{font-size:9px;padding:5px 7px}}
+@media(max-width:420px){.history-panel{padding:9px 10px}.history-panel .section-head h2{font-size:12px}#mapFilters button{font-size:10px;padding:9px 6px}#app{padding:8px;gap:9px}.panel{padding:13px}.action{font-size:14px;min-height:58px}.stats-grid .value{font-size:19px}.stats-grid .label{font-size:10px}.utility{font-size:10px}.brand h1{font-size:clamp(16px,5.1vw,21px)}.summit-mark{width:34px;height:24px;flex-basis:34px}.stevie-avatar{width:55px;height:55px;flex-basis:55px}header{gap:8px;padding:9px 10px}.brand{padding-left:8px}#walkBadge{font-size:9px;padding:5px 7px}}
 @media(min-width:700px){#app{padding:18px}.action{font-size:17px}.panel{padding:18px}}
 
 .data-overlay[hidden]{display:none!important}
@@ -160,25 +160,35 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
 
   <section class="panel">
     <div class="section-head"><h2>📊 Insights</h2><button id="detailsBtn" style="border:0;background:none;color:#1769e8;font-weight:750;font-size:12px;padding:5px">View details&nbsp;›</button></div>
-    <div class="stats-grid">
-      <div class="stat"><div class="symbol">🐾</div><div class="value" id="peeTotal">0</div><div class="label">Pee events</div></div>
-      <div class="stat"><div class="symbol">🛣️</div><div class="value" id="walkDistance">—</div><div class="label">Last walk distance</div></div>
-      <div class="stat"><div class="symbol">◷</div><div class="value" id="walkDuration">—</div><div class="label">Last walk time</div></div>
-      <div class="stat"><div class="symbol">📅</div><div class="value" id="lastWalkDate">—</div><div class="label">Last walk</div></div>
+    <div class="insights-periods" id="insightsPeriods" aria-label="Insights time period">
+      <button type="button" data-insight-period="today">Today</button>
+      <button type="button" data-insight-period="week">7 Days</button>
+      <button type="button" data-insight-period="month">30 Days</button>
+      <button type="button" data-insight-period="quarter">90 Days</button>
+      <button type="button" data-insight-period="year">This Year</button>
+      <button type="button" data-insight-period="all">All Time</button>
     </div>
-    <div class="insight-callout" id="insightCallout">Log a few walks and pee events to start seeing patterns.</div>
+    <div class="stats-grid">
+      <div class="stat"><div class="symbol">💧</div><div class="value" id="insightPees">0</div><div class="label">Pee Events</div></div>
+      <div class="stat"><div class="symbol">🐾</div><div class="value" id="insightWalks">0</div><div class="label">Total Walks</div></div>
+      <div class="stat"><div class="symbol">📍</div><div class="value" id="insightDistance">0.0 mi</div><div class="label">Distance Walked</div></div>
+      <div class="stat"><div class="symbol">🚶</div><div class="value" id="insightAvgDistance">—</div><div class="label">Average Walk</div></div>
+      <div class="stat"><div class="symbol">⏱️</div><div class="value" id="insightAvgDuration">—</div><div class="label">Average Walk Duration</div></div>
+      <div class="stat"><div class="symbol">💧</div><div class="value" id="insightPeesPerWalk">—</div><div class="label">Pees per Walk</div></div>
+    </div>
+    <div class="insight-callout" id="insightCallout">Your walking and pee statistics for the selected period.</div>
     <div id="insightDetails">
       <div class="detail-grid">
-        <div class="detail"><strong id="perMile">—</strong><span>Average pee events per mile</span></div>
+        <div class="detail"><strong id="insightLongestDistance">—</strong><span>Longest walk</span></div>
+        <div class="detail"><strong id="insightLongestDuration">—</strong><span>Longest walk duration</span></div>
+        <div class="detail"><strong id="insightTotalDuration">—</strong><span>Total walking time</span></div>
+        <div class="detail"><strong id="insightMostPees">—</strong><span>Most pees in one walk</span></div>
+        <div class="detail"><strong id="perMile">—</strong><span>Pee events per mile</span></div>
         <div class="detail"><strong id="repeatCount">—</strong><span>Events near a repeat location</span></div>
-        <div class="detail"><strong id="morningCount">—</strong><span>Morning events (5am–noon)</span></div>
-        <div class="detail"><strong id="eveningCount">—</strong><span>Evening events (5pm–midnight)</span></div>
       </div>
       <h3>Most frequently marked areas</h3>
       <ol class="rank-list" id="favoriteList"><li>Not enough data yet</li></ol>
-      <h3>When she marks</h3>
-      <div class="detail"><strong id="peakTime">—</strong><span>Most common time-of-day period</span></div>
-      <p style="font-size:10px;color:#8994a8;line-height:1.4">Location groups are approximate clusters based on events within about 40 metres. They are useful for spotting tendencies, not exact territory boundaries. Pee density reflects recorded events, not time spent at a location.</p>
+      <p style="font-size:10px;color:#8994a8;line-height:1.4">Location groups are approximate clusters within about 40 metres. Pee density reflects recorded events, not time spent at a location.</p>
     </div>
   </section>
 
@@ -192,7 +202,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer id="footerStats">0 walks · 0 pee events logged</footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.0</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -316,18 +326,18 @@ function refreshHeatmap(){
   if(heatVisible)heatLayer.addTo(map);
 }
 function updateStats(){
-  $('peeTotal').textContent=data.pees.length;
+
   $('undoPeeBtn').disabled=data.pees.length===0;
   $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${heatVisible?'heatmap':'grouped markers'}</span>`;
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
   if(last){
     const dist=pathDistance(last.path||[]);
-    $('walkDistance').textContent=fmtDistance(dist);
-    $('walkDuration').textContent=last.startTime&&last.endTime?fmtDuration(last.endTime-last.startTime):'—';
-    $('lastWalkDate').textContent=new Date(last.startTime||last.id||Date.now()).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+
+
+
     $('walkSubtitle').textContent=`Last walk · ${fmtDistance(dist)} · ${fmtDuration((last.endTime||0)-(last.startTime||0))}`;
-  }else{$('walkDistance').textContent='—';$('walkDuration').textContent='—';$('lastWalkDate').textContent='—';$('walkSubtitle').textContent='Your dog’s walking map';}
+  }else{$('walkSubtitle').textContent='Your dog’s walking map';}
   updateInsights();
 }
 function clusterPees(events,radius=40){
@@ -340,27 +350,47 @@ function clusterPees(events,radius=40){
   });
   return clusters.sort((a,b)=>b.events.length-a.events.length);
 }
+const INSIGHTS_PERIOD_KEY='peeTrackerInsightsPeriod';
+const INSIGHTS_PERIODS=['today','week','month','quarter','year','all'];
+let insightsPeriod=INSIGHTS_PERIODS.includes(localStorage.getItem(INSIGHTS_PERIOD_KEY))?localStorage.getItem(INSIGHTS_PERIOD_KEY):'month';
+function insightPeriodStart(){
+  const now=new Date(),start=new Date(now);
+  if(insightsPeriod==='all')return -Infinity;
+  if(insightsPeriod==='today')start.setHours(0,0,0,0);
+  else if(insightsPeriod==='year')start.setMonth(0,1),start.setHours(0,0,0,0);
+  else start.setTime(now.getTime()-({week:7,month:30,quarter:90}[insightsPeriod])*86400000);
+  return start.getTime();
+}
 function updateInsights(){
-  const valid=data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
-  const totalMiles=data.walks.reduce((s,w)=>s+pathDistance(w.path||[]),0)/1609.344;
-  $('perMile').textContent=totalMiles>0?(data.pees.length/totalMiles).toFixed(1):'—';
+  const start=insightPeriodStart(),end=Date.now();
+  const pees=data.pees.filter(p=>{const t=new Date(p.timestamp).getTime();return Number.isFinite(t)&&t>=start&&t<=end;});
+  const walks=data.walks.filter(w=>{const t=walkStart(w);return Number.isFinite(t)&&t>=start&&t<=end&&Number.isFinite(Number(w.endTime))&&Number(w.endTime)>=t;});
+  const distances=walks.map(w=>pathDistance(w.path||[]));
+  const totalMeters=distances.reduce((a,b)=>a+b,0),miles=totalMeters/1609.344;
+  const durations=walks.map(w=>Number(w.endTime)-walkStart(w));
+  const totalMs=durations.reduce((a,b)=>a+b,0);
+  $('insightPees').textContent=pees.length;
+  $('insightWalks').textContent=walks.length;
+  $('insightDistance').textContent=miles.toFixed(1)+' mi';
+  $('insightAvgDistance').textContent=walks.length?(miles/walks.length).toFixed(1)+' mi':'—';
+  $('insightAvgDuration').textContent=walks.length?fmtDuration(totalMs/walks.length):'—';
+  const walkIds=new Set(walks.map(w=>String(w.id??w.startTime)));
+  const linkedPees=pees.filter(p=>p.walkId!=null&&walkIds.has(String(p.walkId)));
+  $('insightPeesPerWalk').textContent=walks.length?(linkedPees.length/walks.length).toFixed(1):'—';
+  $('insightLongestDistance').textContent=walks.length?fmtDistance(Math.max(...distances)):'—';
+  $('insightLongestDuration').textContent=walks.length?fmtDuration(Math.max(...durations)):'—';
+  $('insightTotalDuration').textContent=walks.length?fmtDuration(totalMs):'—';
+  const peeCounts=new Map();linkedPees.forEach(p=>{const id=String(p.walkId);peeCounts.set(id,(peeCounts.get(id)||0)+1);});
+  $('insightMostPees').textContent=walks.length?Math.max(0,...peeCounts.values()):'—';
+  $('perMile').textContent=miles>0?(pees.length/miles).toFixed(1):'—';
+  const valid=pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   const clusters=clusterPees(valid);
-  const repeat=clusters.filter(c=>c.events.length>1).reduce((s,c)=>s+c.events.length,0);
-  $('repeatCount').textContent=repeat;
-  const hours=valid.map(p=>new Date(p.timestamp).getHours());
-  $('morningCount').textContent=hours.filter(h=>h>=5&&h<12).length;
-  $('eveningCount').textContent=hours.filter(h=>h>=17).length;
-  const buckets={'Early morning (5–8am)':0,'Morning (8am–noon)':0,'Afternoon (noon–5pm)':0,'Evening (5pm–midnight)':0,'Overnight (midnight–5am)':0};
-  hours.forEach(h=>{if(h<5)buckets['Overnight (midnight–5am)']++;else if(h<8)buckets['Early morning (5–8am)']++;else if(h<12)buckets['Morning (8am–noon)']++;else if(h<17)buckets['Afternoon (noon–5pm)']++;else buckets['Evening (5pm–midnight)']++;});
-  const peak=Object.entries(buckets).sort((a,b)=>b[1]-a[1])[0];
-  $('peakTime').textContent=valid.length?`${peak[0]} · ${peak[1]} events`:'Not enough data';
+  $('repeatCount').textContent=clusters.filter(c=>c.events.length>1).reduce((n,c)=>n+c.events.length,0);
   const list=$('favoriteList');list.innerHTML='';
-  const top=clusters.slice(0,5);
-  if(!top.length){list.innerHTML='<li>Not enough location data yet</li>';}
-  else top.forEach((c,i)=>{const li=document.createElement('li');li.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'}</b>`;list.appendChild(li);});
-  if(!valid.length)$('insightCallout').textContent='Log a few pee events to reveal repeat locations and time-of-day patterns.';
-  else if(clusters[0]&&clusters[0].events.length>1)$('insightCallout').textContent=`Her most frequently marked area has ${clusters[0].events.length} recorded events. Open details to see the top locations.`;
-  else $('insightCallout').textContent='Your location history is building. Repeat spots will become clearer as you log more walks.';
+  if(!clusters.length)list.innerHTML='<li>Not enough location data yet</li>';
+  else clusters.slice(0,5).forEach((c,i)=>{const li=document.createElement('li');li.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'}</b>`;list.appendChild(li);});
+  $('insightCallout').textContent=!walks.length&&!pees.length?'No walks or pee events recorded for this period.':`${walks.length} completed ${walks.length===1?'walk':'walks'} and ${pees.length} pee ${pees.length===1?'event':'events'} in this period.`;
+  $('insightsPeriods').querySelectorAll('button').forEach(b=>{const active=b.dataset.insightPeriod===insightsPeriod;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
 }
 renderExistingData();
 centerOnMe();
@@ -457,6 +487,7 @@ function toggleHeatmap(){
 $('mapLayerBtn').addEventListener('click',toggleHeatmap);
 $('locateBtn').addEventListener('click',centerOnMe);
 $('detailsBtn').addEventListener('click',()=>{$('insightDetails').classList.toggle('open');$('detailsBtn').textContent=$('insightDetails').classList.contains('open')?'Hide details ⌃':'View details ›';});
+$('insightsPeriods').addEventListener('click',event=>{const b=event.target.closest('button[data-insight-period]');if(!b)return;insightsPeriod=b.dataset.insightPeriod;localStorage.setItem(INSIGHTS_PERIOD_KEY,insightsPeriod);updateInsights();});
 
 $('exportBtn').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
