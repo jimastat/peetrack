@@ -203,7 +203,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.4</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.5</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -277,13 +277,13 @@ function renderPeeMarkers(){
   peeMarkersLayer.clearLayers();
   groupVisiblePees().forEach(g=>{
     const count=g.events.length;
-    if(count===1){L.circleMarker([g.lat,g.lng],{radius:7,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.95}).bindPopup(popupForGroup(g),{maxWidth:290}).addTo(peeMarkersLayer);}
+    if(count===1){L.circleMarker([g.lat,g.lng],{radius:7,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.95}).bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false}).addTo(peeMarkersLayer);}
     else{
       const diameter=count>=100?47:count>=10?42:36;
       const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${count>=10?'many':''}">${count}</div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
       const marker=L.marker([g.lat,g.lng],{icon}).addTo(peeMarkersLayer);
-      marker.bindPopup(popupForGroup(g),{maxWidth:290});
-      // The bound popup opens on tap; leave zoom and map position unchanged.
+      marker.bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false});
+      // The bound popup opens on tap; popupopen pans without changing zoom.
     }
   });
 }
@@ -487,8 +487,27 @@ $('undoPeeBtn').addEventListener('click',()=>{
   setStatus('Last pee entry removed.');toast('Last pee undone');
 });
 // Delete a single visit from a location history popup, using its original storage index.
+// Center the actual popup within the map's usable viewport, not the marker.
+// Keep clearance for the two upper-left map controls and the bottom count badge.
+function centerVisiblePopup(popup){
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    if(!popup.isOpen()||map._popup!==popup)return;
+    const element=popup.getElement(),mapElement=map.getContainer();
+    if(!element||!mapElement)return;
+    const outer=mapElement.getBoundingClientRect(),rect=element.getBoundingClientRect();
+    if(!outer.width||!outer.height||!rect.width||!rect.height)return;
+    const topReserve=90,bottomReserve=52,sideReserve=14;
+    const usableHeight=Math.max(60,outer.height-topReserve-bottomReserve);
+    const desiredX=outer.left+outer.width/2;
+    const desiredY=outer.top+topReserve+usableHeight/2;
+    const currentX=rect.left+rect.width/2,currentY=rect.top+rect.height/2;
+    const dx=currentX-desiredX,dy=currentY-desiredY;
+    if(Math.abs(dx)>2||Math.abs(dy)>2)map.panBy([dx,dy],{animate:true,duration:0.28});
+  }));
+}
 map.on('popupopen',event=>{
   const element=event.popup.getElement();if(!element)return;
+  centerVisiblePopup(event.popup);
   element.querySelectorAll('.visit-delete').forEach(button=>button.addEventListener('click',()=>{
     const index=Number(button.dataset.peeIndex);
     if(!Number.isInteger(index)||index<0||index>=data.pees.length)return;
