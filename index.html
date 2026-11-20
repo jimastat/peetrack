@@ -276,7 +276,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.2</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.3</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -423,10 +423,19 @@ function groupVisiblePees(){
 function popupForGroup(g){
   const events=g.events.slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   const dates=events.map(e=>new Date(e.timestamp).getTime()).filter(Number.isFinite);
-  const distinctWalks=new Set(events.map(e=>e.walkId).filter(x=>x!==undefined&&x!==null));
+  // Resolve walk membership from saved walk IDs, falling back to walk time windows
+  // for legacy events that were recorded without an ID.
+  const distinctWalks=new Set();
+  events.forEach(e=>{
+    const t=new Date(e.timestamp).getTime();
+    const linked=e.walkId==null?null:data.walks.find(w=>String(w.id??w.startTime)===String(e.walkId));
+    const matched=linked||data.walks.find(w=>Number.isFinite(t)&&t>=walkStart(w)&&t<=Number(w.endTime)+120000);
+    if(matched)distinctWalks.add(String(matched.id??matched.startTime));
+    else if(e.walkId!=null)distinctWalks.add(String(e.walkId));
+  });
   const dateText=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
   const heading=events.length===1?'Pee location':`${events.length} pee events nearby`;
-  const meta=`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walk IDs: ${distinctWalks.size}<br>`:''}`;
+  const meta=`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walks: ${distinctWalks.size}<br>`:''}`;
   const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
   return `<div class="visit-popup"><h3>${heading}</h3><div class="visit-meta">${meta}</div><div class="visit-list">${rows}</div></div>`;
 }
