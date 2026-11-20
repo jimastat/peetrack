@@ -203,7 +203,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.5</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.6</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -228,6 +228,7 @@ function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(data));}
 let data=loadData();
 
 const map=L.map('map',{tap:true,zoomControl:true}).setView([45.5231,-122.6765],13);
+map.zoomControl.setPosition('bottomright');
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
 let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
