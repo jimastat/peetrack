@@ -147,7 +147,7 @@ header{position:relative;padding-right:58px}
 .settings-footer button[type=submit]{background:#1769e8;color:white;border-color:#1769e8}
 @media(max-width:520px){#settingsOverlay{padding:0;align-items:flex-end}.settings-sheet{width:100%;max-height:94dvh;border-radius:20px 20px 0 0}}
 
-/* Walk History: read-only foundation for future GPS repair. */
+/* Walk History: view and selectively delete completed walks. */
 .walk-history-open{margin-top:12px;width:100%;border:1px solid #d7e0eb;background:#f5f7fb;border-radius:10px;color:#28517a;font-size:13px;font-weight:750;padding:11px 13px;display:flex;align-items:center;justify-content:space-between}
 .walk-history-help{font-size:12px;color:#69778a;line-height:1.5;margin:0;padding:12px 17px 8px}
 .walk-history-list{padding:0 12px 12px;overflow-y:auto}
@@ -157,7 +157,19 @@ header{position:relative;padding-right:58px}
 .walk-history-metric{font-size:12px;color:#5a6879}.walk-history-metric strong{display:block;color:#253c55;font-size:15px;margin-bottom:2px}
 .walk-history-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .walk-history-actions button{border-radius:9px;padding:9px 11px;font-size:12px;font-weight:750;border:1px solid #b9d0eb;background:#eaf3ff;color:#185dba}
+.walk-history-actions button.walk-delete{background:#fff5f4;border-color:#e7b4ae;color:#ad3029}
 .walk-history-actions button:disabled{border-color:#e0e4ea;background:#f5f6f8;color:#9ba5b2}
+#walkDeleteOverlay{z-index:11000}
+.walk-delete-sheet{max-width:440px}
+.walk-delete-body{padding:16px 18px;color:#283c50;font-size:13px;line-height:1.5}
+.walk-delete-body p{margin:0 0 13px}
+.walk-delete-options{display:grid;gap:10px;margin:14px 0;padding:12px;background:#f6f8fb;border-radius:10px}
+.walk-delete-options label{display:flex;align-items:flex-start;gap:9px;cursor:pointer}
+.walk-delete-options input{margin-top:3px;accent-color:#b9342b}
+.walk-delete-warning{font-size:12px;color:#a34231}
+.walk-delete-buttons{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}
+.walk-delete-buttons button{padding:10px 14px;border-radius:9px;font-weight:750;border:1px solid #cad4df;background:#f4f7fa;color:#273b50}
+.walk-delete-buttons .danger{background:#b9342b;color:#fff;border-color:#b9342b}
 .walk-history-empty{padding:25px 15px;text-align:center;color:#758296;font-size:13px}
 .selected-walk-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#e6f5f4;border:1px solid #a8d7d4;border-radius:11px;padding:10px 12px;margin:12px 0;color:#006c73;font-size:12px;font-weight:750}
 .selected-walk-bar[hidden]{display:none!important}
@@ -166,7 +178,7 @@ header{position:relative;padding-right:58px}
 #routeModes button:disabled{opacity:.6;cursor:not-allowed}
 #selectedWalkNote{font-size:11px;color:#007780;font-weight:650;margin:6px 0 0}
 
-/* v1.2.3: Stevie header stays visible while the document scrolls. */
+/* v1.2.4: Stevie header stays visible while the document scrolls. */
 #app > header {
   position: sticky;
   top: max(6px, env(safe-area-inset-top));
@@ -257,7 +269,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.3</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.4</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -297,9 +309,23 @@ header{position:relative;padding-right:58px}
 <div id="walkHistoryOverlay" class="data-overlay" hidden>
   <section class="data-sheet walk-history-sheet" role="dialog" aria-modal="true" aria-labelledby="walkHistoryTitle">
     <div class="data-sheet-head"><div><h2 id="walkHistoryTitle">🐾 Walk History</h2><small id="walkHistoryCount">Completed walks</small></div><button type="button" id="closeWalkHistory" aria-label="Close walk history">✕</button></div>
-    <p class="walk-history-help">Select a walk to see its recorded route on the map. GPS gap review and corrections will be added in a future update.</p>
+    <p class="walk-history-help">Select a walk to view its route, or delete a walk and optionally its associated pee events. GPS gap review will be added in a future update.</p>
     <div id="walkHistoryList" class="data-list walk-history-list"></div>
-    <div class="data-sheet-foot"><span>Original GPS recordings are unchanged</span><button type="button" id="closeWalkHistoryBottom">Done</button></div>
+    <div class="data-sheet-foot"><span>Export a backup before deleting important records</span><button type="button" id="closeWalkHistoryBottom">Done</button></div>
+  </section>
+</div>
+<div id="walkDeleteOverlay" class="data-overlay" hidden>
+  <section class="data-sheet walk-delete-sheet" role="dialog" aria-modal="true" aria-labelledby="walkDeleteTitle">
+    <div class="data-sheet-head"><div><h2 id="walkDeleteTitle">Delete Walk?</h2><small id="walkDeleteSubtitle"></small></div><button type="button" id="walkDeleteClose" aria-label="Cancel deletion">✕</button></div>
+    <div class="walk-delete-body">
+      <p>Choose what to remove from this device:</p>
+      <div class="walk-delete-options">
+        <label><input type="radio" name="walkDeleteChoice" value="both" checked><span id="walkDeleteBothLabel">Delete walk and associated pee events</span></label>
+        <label><input type="radio" name="walkDeleteChoice" value="walk"><span>Delete walk only — keep the pee events</span></label>
+      </div>
+      <p class="walk-delete-warning">This cannot be undone unless you restore a previous backup. Export Data in Settings first if you want a recovery copy.</p>
+      <div class="walk-delete-buttons"><button type="button" id="walkDeleteCancel">Cancel</button><button type="button" id="walkDeleteConfirm" class="danger">Delete</button></div>
+    </div>
   </section>
 </div>
 <div id="toast"></div>
@@ -871,17 +897,56 @@ $('dataPeriod').addEventListener('change',renderDataList);
 dataOverlay.addEventListener('click',e=>{if(e.target===dataOverlay)closeDataList();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!dataOverlay.hidden)closeDataList();});
 
-// Walk History is read-only. It uses the same stored paths and distance calculation
-// as Insights, leaving a clear integration point for later reversible GPS repairs.
+// Walk History supports explicit, confirmed deletion. GPS repair remains a future feature.
 const walkHistoryOverlay=document.getElementById('walkHistoryOverlay');
-function walkHistoryPeeCount(w){
+function associatedPeeIndices(w){
+  // Keep the same ID-first and timestamp-fallback matching used in Individual Walk View.
   const key=String(w.id??w.startTime),start=walkStart(w),end=Number(w.endTime);
-  return data.pees.filter(p=>{
+  return data.pees.map((p,index)=>({p,index})).filter(({p})=>{
     if(p.walkId!==undefined&&p.walkId!==null)return String(p.walkId)===key;
     const t=new Date(p.timestamp).getTime();
     return Number.isFinite(start)&&Number.isFinite(end)&&Number.isFinite(t)&&t>=start&&t<=end+120000;
-  }).length;
+  }).map(({index})=>index);
 }
+function walkHistoryPeeCount(w){return associatedPeeIndices(w).length;}
+let pendingWalkDeletion=null;
+const walkDeleteOverlay=$('walkDeleteOverlay');
+function closeWalkDelete(){walkDeleteOverlay.hidden=true;pendingWalkDeletion=null;document.body.style.overflow=walkHistoryOverlay.hidden?'':'hidden';}
+function requestWalkDeletion(index){
+  if(isWalking){toast('Stop the active walk before deleting a walk');return;}
+  const walk=data.walks[index];if(!walk)return;
+  pendingWalkDeletion={walk,index};
+  const date=walkStart(walk),count=associatedPeeIndices(walk).length;
+  $('walkDeleteSubtitle').textContent=`${Number.isFinite(date)?new Date(date).toLocaleString():'Undated walk'} · ${fmtDistance(pathDistance(walk.path||[]))} · ${count} pee ${count===1?'event':'events'}`;
+  $('walkDeleteBothLabel').textContent=`Delete walk and all ${count} associated pee ${count===1?'event':'events'}`;
+  walkDeleteOverlay.querySelector('input[value="both"]').checked=true;
+  walkDeleteOverlay.hidden=false;document.body.style.overflow='hidden';
+}
+function confirmWalkDeletion(){
+  if(!pendingWalkDeletion)return;
+  if(isWalking){toast('Stop the active walk before deleting');return;}
+  const {walk}=pendingWalkDeletion,index=data.walks.indexOf(walk);
+  if(index<0){closeWalkDelete();renderWalkHistory();return;}
+  const removePees=walkDeleteOverlay.querySelector('input[name="walkDeleteChoice"]:checked')?.value==='both';
+  const matching=new Set(removePees?associatedPeeIndices(walk):[]);
+  const next={...data,walks:data.walks.filter((_,i)=>i!==index),pees:data.pees.filter((_,i)=>!matching.has(i))};
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(next));}
+  catch(error){alert('Could not save the deletion. No records were changed. '+error.message);return;}
+  // Exit selected walk view before changing walk indices; no other walks are modified.
+  if(selectedHistoryWalkIndex!==null){
+    selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+    if(preWalkViewMapState){({routeMode,routeStyle,heatVisible,selectedPeriod}=preWalkViewMapState);preWalkViewMapState=null;}
+    syncSelectedWalkControls();
+  }
+  data=next;closeWalkDelete();renderWalkHistory();map.closePopup();renderExistingData();
+  if(!dataOverlay.hidden)renderDataList();
+  toast(`Walk deleted${matching.size?` · ${matching.size} pee events removed`:''}`);
+}
+$('walkDeleteClose').addEventListener('click',closeWalkDelete);
+$('walkDeleteCancel').addEventListener('click',closeWalkDelete);
+$('walkDeleteConfirm').addEventListener('click',confirmWalkDeletion);
+walkDeleteOverlay.addEventListener('click',e=>{if(e.target===walkDeleteOverlay)closeWalkDelete();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!walkDeleteOverlay.hidden)closeWalkDelete();});
 function renderWalkHistory(){
   const root=$('walkHistoryList');root.replaceChildren();
   const walks=data.walks.map((walk,index)=>({walk,index})).sort((a,b)=>(walkStart(b.walk)||0)-(walkStart(a.walk)||0));
@@ -906,7 +971,10 @@ function renderWalkHistory(){
     view.disabled=path.length===0;
     view.addEventListener('click',()=>showHistoryWalk(index));
     const repair=document.createElement('button');repair.type='button';repair.textContent='GPS review · Coming soon';repair.disabled=true;
-    actions.append(view,repair);card.appendChild(actions);frag.appendChild(card);
+    const del=document.createElement('button');del.type='button';del.className='walk-delete';del.textContent='🗑 Delete Walk';
+    del.disabled=isWalking;del.title=isWalking?'Stop recording before deleting a walk':'';
+    del.addEventListener('click',()=>requestWalkDeletion(index));
+    actions.append(view,repair,del);card.appendChild(actions);frag.appendChild(card);
   });root.appendChild(frag);
 }
 function openWalkHistory(){renderWalkHistory();walkHistoryOverlay.hidden=false;document.body.style.overflow='hidden';}
@@ -972,7 +1040,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!walkHistoryOverlay
 window.addEventListener('resize',()=>map.invalidateSize());
 </script>
 <script>
-/* v1.2.3: cosmetic shadow only; does not affect map or tracking. */
+/* v1.2.4: cosmetic shadow only; does not affect map or tracking. */
 (() => {
   const header = document.querySelector('#app > header');
   if (!header) return;
