@@ -85,6 +85,15 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 #routeModes button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:8px 11px;min-height:34px}
 #routeModes button.active{background:#1769e8;color:white;border-color:#1769e8}
 @media(max-width:420px){#routeModes button{padding:7px 9px;font-size:10px}}
+#routeStyleSelector{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid #e4eaf2}
+#routeStyleSelector[hidden]{display:none!important}
+#routeStyleSelector .route-label{font-size:12px;font-weight:750;color:#35465d}
+#routeStyles{display:flex;gap:4px}
+#routeStyles button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:8px 13px;min-height:34px}
+#routeStyles button.active{background:#1769e8;color:white;border-color:#1769e8}
+.walk-density-legend{display:flex;align-items:center;gap:8px;font-size:11px;color:#536175;margin-top:8px}
+.walk-density-legend[hidden]{display:none!important}
+.walk-density-ramp{height:8px;flex:1;border-radius:5px;background:linear-gradient(90deg,#45a86a,#e5c63b,#ed8a2c,#d34c35)}
 .cluster-icon{background:transparent;border:0}
 .cluster-bubble{display:flex;align-items:center;justify-content:center;border:3px solid white;border-radius:50%;background:#e9a51c;color:#172235;font-weight:850;font-size:14px;box-shadow:0 2px 9px #17223566;width:100%;height:100%}
 .cluster-bubble.many{background:#d96c23;color:white}
@@ -145,6 +154,8 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
     <div class="section-head"><h2>📍 Map history</h2>
     <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
     <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
+    <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
+    <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
   </section>
 
   <section class="panel">
@@ -203,7 +214,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.6</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.7</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -231,6 +242,8 @@ const map=L.map('map',{tap:true,zoomControl:true}).setView([45.5231,-122.6765],1
 map.zoomControl.setPosition('bottomright');
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
 let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
+const ROUTE_STYLE_KEY='peeTrackerRouteStyle';
+let routeStyle=localStorage.getItem(ROUTE_STYLE_KEY)==='heatmap'?'heatmap':'lines';
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const $=id=>document.getElementById(id);
 function setStatus(msg){$('status').textContent=msg;}
@@ -299,6 +312,52 @@ function routePeriodStart(){
   else start.setTime(now.getTime()-(selectedPeriod==='week'?7:30)*86400000);
   return start.getTime();
 }
+// Count each walk once per ~20m cell, so pausing or slow GPS sampling cannot
+// artificially inflate the route frequency. Draw the original GPS geometry.
+function routeHeatSegments(walks){
+  const cellSize=20, R=6371000, lat0=45.5231*Math.PI/180;
+  const project=p=>({x:p.lng*Math.PI/180*R*Math.cos(lat0),y:p.lat*Math.PI/180*R});
+  const key=(x,y)=>`${Math.floor(x/cellSize)},${Math.floor(y/cellSize)}`;
+  const counts=new Map();
+  const paths=walks.map(w=>w.walk.path.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)));
+  for(const path of paths){
+    const visited=new Set();
+    for(let i=1;i<path.length;i++){
+      const a=project(path[i-1]),b=project(path[i]),dist=Math.hypot(b.x-a.x,b.y-a.y);
+      // Avoid creating fictitious coverage across GPS gaps > 250m.
+      if(dist>250)continue;
+      const steps=Math.max(1,Math.ceil(dist/10));
+      for(let j=0;j<=steps;j++){const t=j/steps;visited.add(key(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t));}
+    }
+    visited.forEach(k=>counts.set(k,(counts.get(k)||0)+1));
+  }
+  const maxCount=Math.max(1,...counts.values());
+  const renderer=L.canvas({padding:0.3});
+  for(const path of paths){
+    for(let i=1;i<path.length;i++){
+      const a=project(path[i-1]),b=project(path[i]),dist=Math.hypot(b.x-a.x,b.y-a.y);
+      if(dist>250||dist===0)continue;
+      const steps=Math.max(1,Math.ceil(dist/15));
+      let previous=path[i-1];
+      for(let j=1;j<=steps;j++){
+        const t=j/steps,mid=(j-.5)/steps;
+        const current={lat:path[i-1].lat+(path[i].lat-path[i-1].lat)*t,lng:path[i-1].lng+(path[i].lng-path[i-1].lng)*t};
+        const x=Math.floor((a.x+(b.x-a.x)*mid)/cellSize),y=Math.floor((a.y+(b.y-a.y)*mid)/cellSize);
+        let frequency=0;
+        for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)frequency=Math.max(frequency,counts.get(`${x+dx},${y+dy}`)||0);
+        const ratio=maxCount>1?(frequency-1)/(maxCount-1):0;
+        const color=ratio>=.75?'#d34c35':ratio>=.5?'#ed8a2c':ratio>=.25?'#e5c63b':'#45a86a';
+        L.polyline([[previous.lat,previous.lng],[current.lat,current.lng]],{color,weight:4,opacity:.32+ratio*.48,interactive:false,renderer}).addTo(walkPathsLayer);
+        previous=current;
+      }
+    }
+  }
+}
+function updateRouteControls(){
+  $('routeStyleSelector').hidden=routeMode!=='filtered';
+  $('walkDensityLegend').hidden=routeMode!=='filtered'||routeStyle!=='heatmap';
+  $('routeStyles').querySelectorAll('button').forEach(b=>{const active=b.dataset.style===routeStyle;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+}
 function renderWalkRoutes(){
   walkPathsLayer.clearLayers();
   const indexed=data.walks.map((walk,index)=>({walk,index})).filter(x=>Array.isArray(x.walk.path)&&x.walk.path.length>1);
@@ -307,12 +366,13 @@ function renderWalkRoutes(){
     L.polyline(latest.walk.path.map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.85}).addTo(walkPathsLayer);
   }else if(routeMode==='filtered'){
     const start=routePeriodStart();
-    indexed.forEach(x=>{
-      const t=walkStart(x.walk);
-      if(start!==-Infinity&&(!Number.isFinite(t)||t<start))return;
-      L.polyline(x.walk.path.map(p=>[p.lat,p.lng]),{color:'#808b9b',weight:2,opacity:.28}).addTo(walkPathsLayer);
+    const filtered=indexed.filter(x=>{const t=walkStart(x.walk);return start===-Infinity||(Number.isFinite(t)&&t>=start);});
+    if(routeStyle==='heatmap'){routeHeatSegments(filtered);}
+    else filtered.forEach(x=>{
+      L.polyline(x.walk.path.map(p=>[p.lat,p.lng]),{color:'#727d8d',weight:2,opacity:.38}).addTo(walkPathsLayer);
     });
   }
+  updateRouteControls();
   if(!map.hasLayer(walkPathsLayer))walkPathsLayer.addTo(map);
 }
 function renderExistingData(){
@@ -528,11 +588,34 @@ $('mapFilters').addEventListener('click',event=>{
 $('routeModes').addEventListener('click',event=>{
   const button=event.target.closest('button[data-route]');if(!button)return;
   routeMode=button.dataset.route;
+  if(routeMode==='filtered'&&routeStyle==='heatmap'&&heatVisible){
+    heatVisible=false;
+    $('peeDensityLegend').hidden=true;
+    if(heatLayer)map.removeLayer(heatLayer);
+    peeMarkersLayer.addTo(map);
+    updateStats();
+  }
   $('routeModes').querySelectorAll('button').forEach(b=>{const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   renderWalkRoutes();
   setStatus(routeMode==='off'?'Saved walk routes hidden.':routeMode==='latest'?'Showing most recent saved walk.':'Showing historical routes for the selected period.');
 });
+$('routeStyles').addEventListener('click',event=>{
+  const button=event.target.closest('button[data-style]');if(!button)return;
+  routeStyle=button.dataset.style;
+  localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);
+  if(routeStyle==='heatmap'&&heatVisible){
+    heatVisible=false;$('peeDensityLegend').hidden=true;
+    if(heatLayer)map.removeLayer(heatLayer);
+    peeMarkersLayer.addTo(map);updateStats();
+  }
+  renderWalkRoutes();
+  setStatus(routeStyle==='heatmap'?'Showing route frequency for the selected period.':'Showing individual filtered routes.');
+});
 function toggleHeatmap(){
+  // Pee density and walk density are never displayed simultaneously.
+  if(!heatVisible&&routeMode==='filtered'&&routeStyle==='heatmap'){
+    routeStyle='lines';localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);renderWalkRoutes();
+  }
   heatVisible=!heatVisible;
   $('peeDensityLegend').hidden=!heatVisible;
   if(heatVisible){peeMarkersLayer.remove();refreshHeatmap();}
