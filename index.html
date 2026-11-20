@@ -106,7 +106,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .visit-delete{border:1px solid #efc4c4;border-radius:8px;background:#fff2f2;color:#a72a2a;padding:6px 9px;font-size:13px}
 #cacheBar{width:100%;height:8px;margin-top:10px;display:none}
 #cacheProgress{font-size:11px;color:var(--muted);text-align:center;margin-top:5px}
-footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-version{display:block;font-size:10px;margin-top:5px;color:#9ca6b6}.insights-periods{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px}.insights-periods button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:8px 10px}.insights-periods button.active{background:#1769e8;color:white;border-color:#1769e8}
+footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-version{display:block;font-size:10px;margin-top:5px;color:#9ca6b6}.insights-periods{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;margin:0 0 12px}.insights-periods button{min-width:0;white-space:nowrap;border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:10px;font-weight:700;padding:8px 2px}.insights-periods button.active{background:#1769e8;color:white;border-color:#1769e8}
 #toast{position:fixed;z-index:2000;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#172235;color:white;border-radius:30px;padding:10px 16px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #toast.show{opacity:1}
 @media(max-width:420px){.history-panel{padding:9px 10px}.history-panel .section-head h2{font-size:12px}#mapFilters button{font-size:10px;padding:9px 6px}#app{padding:8px;gap:9px}.panel{padding:13px}.action{font-size:14px;min-height:58px}.stats-grid .value{font-size:19px}.stats-grid .label{font-size:10px}.utility{font-size:10px}.brand h1{font-size:clamp(16px,5.1vw,21px)}.summit-mark{width:34px;height:24px;flex-basis:34px}.stevie-avatar{width:55px;height:55px;flex-basis:55px}header{gap:8px;padding:9px 10px}.brand{padding-left:8px}#walkBadge{font-size:9px;padding:5px 7px}}
@@ -276,7 +276,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.3</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.4</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
