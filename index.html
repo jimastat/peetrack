@@ -165,6 +165,18 @@ header{position:relative;padding-right:58px}
 
 #routeModes button:disabled{opacity:.6;cursor:not-allowed}
 #selectedWalkNote{font-size:11px;color:#007780;font-weight:650;margin:6px 0 0}
+
+/* v1.2.3: Stevie header stays visible while the document scrolls. */
+#app > header {
+  position: sticky;
+  top: max(6px, env(safe-area-inset-top));
+  z-index: 1200;
+  isolation: isolate;
+  transition: box-shadow 160ms ease;
+}
+#app > header.header-scrolled {
+  box-shadow: 0 7px 18px rgba(12, 30, 24, .28), 0 2px 5px rgba(12, 30, 24, .15);
+}
 </style>
 </head>
   
@@ -245,7 +257,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.2</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.3</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -958,6 +970,16 @@ walkHistoryOverlay.addEventListener('click',e=>{if(e.target===walkHistoryOverlay
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!walkHistoryOverlay.hidden)closeWalkHistory();});
 
 window.addEventListener('resize',()=>map.invalidateSize());
+</script>
+<script>
+/* v1.2.3: cosmetic shadow only; does not affect map or tracking. */
+(() => {
+  const header = document.querySelector('#app > header');
+  if (!header) return;
+  const updateShadow = () => header.classList.toggle('header-scrolled', window.scrollY > 12);
+  window.addEventListener('scroll', updateShadow, {passive:true});
+  updateShadow();
+})();
 </script>
 </body>
 </html>
