@@ -245,7 +245,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.1</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.2</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -329,6 +329,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,att
 let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
 const ROUTE_STYLE_KEY='peeTrackerRouteStyle';
 let selectedHistoryWalkIndex=null;
+let preWalkViewMapState=null;
 let routeStyle=localStorage.getItem(ROUTE_STYLE_KEY)==='heatmap'?'heatmap':'lines';
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const selectedWalkLayer=L.layerGroup().addTo(map);
@@ -913,7 +914,11 @@ function showHistoryWalk(index){
   const walk=data.walks[index];if(!walk)return;
   const path=(Array.isArray(walk.path)?walk.path:[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   if(!path.length)return;
-  closeWalkHistory();map.closePopup();selectedHistoryWalkIndex=index;
+  closeWalkHistory();map.closePopup();
+  if(selectedHistoryWalkIndex===null){
+    preWalkViewMapState={routeMode,routeStyle,heatVisible,selectedPeriod};
+  }
+  selectedHistoryWalkIndex=index;
   selectedWalkLayer.clearLayers();
   const points=path.map(p=>[p.lat,p.lng]);
   // White casing keeps deep teal legible over streets and satellite-like map detail.
@@ -931,6 +936,18 @@ function showHistoryWalk(index){
 }
 function exitHistoryWalk(){
   selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+  // Restore the exact map configuration from before Individual Walk View.
+  // The historical pee heatmap can be toggled independently while viewing a walk.
+  if(preWalkViewMapState){
+    ({routeMode,routeStyle,heatVisible,selectedPeriod}=preWalkViewMapState);
+    preWalkViewMapState=null;
+    $('routeModes').querySelectorAll('button').forEach(b=>{
+      const active=b.dataset.route===routeMode;
+      b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+    });
+    $('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period===selectedPeriod));
+    $('peeDensityLegend').hidden=!heatVisible;
+  }
   map.closePopup();syncSelectedWalkControls();renderExistingData();
 }
 $('walkHistoryBtn').addEventListener('click',openWalkHistory);
