@@ -159,10 +159,12 @@ header{position:relative;padding-right:58px}
 .walk-history-actions button{border-radius:9px;padding:9px 11px;font-size:12px;font-weight:750;border:1px solid #b9d0eb;background:#eaf3ff;color:#185dba}
 .walk-history-actions button:disabled{border-color:#e0e4ea;background:#f5f6f8;color:#9ba5b2}
 .walk-history-empty{padding:25px 15px;text-align:center;color:#758296;font-size:13px}
-.selected-walk-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#eaf3ff;border:1px solid #c5d9f2;border-radius:11px;padding:10px 12px;margin:12px 0;color:#244e7a;font-size:12px;font-weight:750}
+.selected-walk-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#e6f5f4;border:1px solid #a8d7d4;border-radius:11px;padding:10px 12px;margin:12px 0;color:#006c73;font-size:12px;font-weight:750}
 .selected-walk-bar[hidden]{display:none!important}
-.selected-walk-bar button{border:1px solid #abc7e9;background:white;border-radius:8px;color:#1c5da5;font-size:11px;font-weight:750;padding:7px 9px;flex-shrink:0}
+.selected-walk-bar button{border:1px solid #9ecbc8;background:white;border-radius:8px;color:#007780;font-size:11px;font-weight:750;padding:7px 9px;flex-shrink:0}
 
+#routeModes button:disabled{opacity:.6;cursor:not-allowed}
+#selectedWalkNote{font-size:11px;color:#007780;font-weight:650;margin:6px 0 0}
 </style>
 </head>
   
@@ -189,6 +191,7 @@ header{position:relative;padding-right:58px}
     <div class="section-head"><h2>📍 Map history</h2>
     <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
     <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
+    <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
     <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
     <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
     <button type="button" id="walkHistoryBtn" class="walk-history-open">📅 View Walk History <span>›</span></button>
@@ -242,7 +245,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.0</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.1</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -325,6 +328,7 @@ map.zoomControl.setPosition('bottomright');
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
 let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
 const ROUTE_STYLE_KEY='peeTrackerRouteStyle';
+let selectedHistoryWalkIndex=null;
 let routeStyle=localStorage.getItem(ROUTE_STYLE_KEY)==='heatmap'?'heatmap':'lines';
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const selectedWalkLayer=L.layerGroup().addTo(map);
@@ -342,7 +346,17 @@ function pathDistance(path){let m=0;for(let i=1;i<(path||[]).length;i++)m+=haver
 function fmtDistance(m){const mi=m/1609.344;return mi<.1?`${Math.round(m)} m`:`${mi.toFixed(1)} mi`;}
 function fmtDuration(ms){const mins=Math.max(0,Math.round(ms/60000));return mins<60?`${mins} min`:`${Math.floor(mins/60)}h ${mins%60}m`;}
 
+function peesForWalk(w){
+  const key=String(w.id??w.startTime),start=walkStart(w),end=Number(w.endTime);
+  return data.pees.map((p,index)=>({...p,_index:index})).filter(p=>{
+    if(!Number.isFinite(p.lat)||!Number.isFinite(p.lng))return false;
+    if(p.walkId!==undefined&&p.walkId!==null)return String(p.walkId)===key;
+    const t=new Date(p.timestamp).getTime();
+    return Number.isFinite(start)&&Number.isFinite(end)&&Number.isFinite(t)&&t>=start&&t<=end+120000;
+  });
+}
 function visiblePees(){
+  if(selectedHistoryWalkIndex!==null&&data.walks[selectedHistoryWalkIndex])return peesForWalk(data.walks[selectedHistoryWalkIndex]);
   if(selectedPeriod==='all')return data.pees.map((p,index)=>({...p,_index:index})).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   const now=new Date(),start=new Date(now);
   if(selectedPeriod==='today')start.setHours(0,0,0,0);
@@ -437,12 +451,13 @@ function routeHeatSegments(walks){
   }
 }
 function updateRouteControls(){
-  $('routeStyleSelector').hidden=routeMode!=='filtered';
-  $('walkDensityLegend').hidden=routeMode!=='filtered'||routeStyle!=='heatmap';
+  $('routeStyleSelector').hidden=selectedHistoryWalkIndex!==null||routeMode!=='filtered';
+  $('walkDensityLegend').hidden=selectedHistoryWalkIndex!==null||routeMode!=='filtered'||routeStyle!=='heatmap';
   $('routeStyles').querySelectorAll('button').forEach(b=>{const active=b.dataset.style===routeStyle;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
 }
 function renderWalkRoutes(){
   walkPathsLayer.clearLayers();
+  if(selectedHistoryWalkIndex!==null){updateRouteControls();return;}
   const indexed=data.walks.map((walk,index)=>({walk,index})).filter(x=>Array.isArray(x.walk.path)&&x.walk.path.length>1);
   const latest=indexed.reduce((best,x)=>!best||((walkStart(x.walk)||0)>(walkStart(best.walk)||0))?x:best,null);
   if(routeMode==='latest'&&latest){
@@ -461,19 +476,27 @@ function renderWalkRoutes(){
 function renderExistingData(){
   renderWalkRoutes();
   renderPeeMarkers();refreshHeatmap();
-  if(heatVisible)peeMarkersLayer.remove();
+  if(heatVisible&&selectedHistoryWalkIndex===null)peeMarkersLayer.remove();
+  else peeMarkersLayer.addTo(map);
   updateStats();
+}
+function historicalPeesForHeatmap(){
+  const index=selectedHistoryWalkIndex;selectedHistoryWalkIndex=null;
+  try{return visiblePees();}finally{selectedHistoryWalkIndex=index;}
 }
 function refreshHeatmap(){
   if(heatLayer)map.removeLayer(heatLayer);
-  const points=visiblePees().map(p=>[p.lat,p.lng,.65]);
+  // Historical context is independent of the selected walk; respect the date filter.
+  const points=(selectedHistoryWalkIndex!==null?historicalPeesForHeatmap():visiblePees()).map(p=>[p.lat,p.lng,.65]);
   heatLayer=L.heatLayer(points,{radius:31,blur:24,maxZoom:18,gradient:{.2:'#273dff',.45:'#20d5e8',.62:'#45e65b',.8:'#ffe02e',1:'#f22b19'}});
-  if(heatVisible)heatLayer.addTo(map);
+  if(heatVisible){heatLayer.addTo(map);if(selectedHistoryWalkIndex!==null&&heatLayer.setOptions)heatLayer.setOptions({minOpacity:.25});}
 }
 function updateStats(){
 
   $('undoPeeBtn').disabled=data.pees.length===0;
-  $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${heatVisible?'heatmap':'grouped markers'}</span>`;
+  if(selectedHistoryWalkIndex!==null){
+    $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${heatVisible?'historical heatmap + markers':'grouped markers'}</span>`;
+  }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${heatVisible?'heatmap':'grouped markers'}</span>`;
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
   if(last){
@@ -663,7 +686,7 @@ map.on('popupopen',event=>{
     setStatus('Selected pee entry deleted.');toast('Pee entry deleted');
   }));
 });
-map.on('zoomend',()=>{if(!heatVisible)renderPeeMarkers();});
+map.on('zoomend',()=>{if(!heatVisible||selectedHistoryWalkIndex!==null)renderPeeMarkers();});
 $('mapFilters').addEventListener('click',event=>{
   const button=event.target.closest('button[data-period]');if(!button)return;
   selectedPeriod=button.dataset.period;
@@ -673,6 +696,7 @@ $('mapFilters').addEventListener('click',event=>{
 
 $('routeModes').addEventListener('click',event=>{
   const button=event.target.closest('button[data-route]');if(!button)return;
+  if(selectedHistoryWalkIndex!==null)return;
   routeMode=button.dataset.route;
   if(routeMode==='filtered'&&routeStyle==='heatmap'&&heatVisible){
     heatVisible=false;
@@ -687,6 +711,7 @@ $('routeModes').addEventListener('click',event=>{
 });
 $('routeStyles').addEventListener('click',event=>{
   const button=event.target.closest('button[data-style]');if(!button)return;
+  if(selectedHistoryWalkIndex!==null)return;
   routeStyle=button.dataset.style;
   localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);
   if(routeStyle==='heatmap'&&heatVisible){
@@ -699,12 +724,12 @@ $('routeStyles').addEventListener('click',event=>{
 });
 function toggleHeatmap(){
   // Pee density and walk density are never displayed simultaneously.
-  if(!heatVisible&&routeMode==='filtered'&&routeStyle==='heatmap'){
+  if(selectedHistoryWalkIndex===null&&!heatVisible&&routeMode==='filtered'&&routeStyle==='heatmap'){
     routeStyle='lines';localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);renderWalkRoutes();
   }
   heatVisible=!heatVisible;
   $('peeDensityLegend').hidden=!heatVisible;
-  if(heatVisible){peeMarkersLayer.remove();refreshHeatmap();}
+  if(heatVisible){if(selectedHistoryWalkIndex===null)peeMarkersLayer.remove();else peeMarkersLayer.addTo(map);refreshHeatmap();}
   else{if(heatLayer)map.removeLayer(heatLayer);peeMarkersLayer.addTo(map);}
   updateStats();setStatus(heatVisible?'Heatmap view on':'Grouped pee markers shown');
 }
@@ -873,22 +898,41 @@ function renderWalkHistory(){
 }
 function openWalkHistory(){renderWalkHistory();walkHistoryOverlay.hidden=false;document.body.style.overflow='hidden';}
 function closeWalkHistory(){walkHistoryOverlay.hidden=true;document.body.style.overflow='';}
+function syncSelectedWalkControls(){
+  const active=selectedHistoryWalkIndex!==null;
+  $('selectedWalkNote').hidden=!active;
+  $('routeModes').querySelectorAll('button').forEach(b=>{
+    b.disabled=active;
+    const selected=active?b.dataset.route==='off':b.dataset.route===routeMode;
+    b.classList.toggle('active',selected);
+    b.setAttribute('aria-pressed',String(selected));
+  });
+  updateRouteControls();
+}
 function showHistoryWalk(index){
   const walk=data.walks[index];if(!walk)return;
   const path=(Array.isArray(walk.path)?walk.path:[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   if(!path.length)return;
-  closeWalkHistory();selectedWalkLayer.clearLayers();
+  closeWalkHistory();map.closePopup();selectedHistoryWalkIndex=index;
+  selectedWalkLayer.clearLayers();
   const points=path.map(p=>[p.lat,p.lng]);
-  L.polyline(points,{color:'#135fc9',weight:5,opacity:.95}).addTo(selectedWalkLayer);
+  // White casing keeps deep teal legible over streets and satellite-like map detail.
+  L.polyline(points,{color:'#ffffff',weight:8,opacity:.95,interactive:false}).addTo(selectedWalkLayer);
+  L.polyline(points,{color:'#008C95',weight:5,opacity:1,interactive:false}).addTo(selectedWalkLayer);
   L.circleMarker(points[0],{radius:6,color:'#fff',weight:2,fillColor:'#249b5a',fillOpacity:1}).addTo(selectedWalkLayer);
   if(points.length>1)L.circleMarker(points[points.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#d85d32',fillOpacity:1}).addTo(selectedWalkLayer);
-  const date=walkStart(walk);$('selectedWalkLabel').textContent=(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+fmtDistance(pathDistance(path));
+  const date=walkStart(walk),peeCount=peesForWalk(walk).length;
+  $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+peeCount+' pee '+(peeCount===1?'event':'events')+' · '+fmtDistance(pathDistance(path));
   $('selectedWalkBar').hidden=false;
+  syncSelectedWalkControls();renderExistingData();
   window.scrollTo({top:0,behavior:'smooth'});
   setTimeout(()=>{map.invalidateSize();if(points.length>1)map.fitBounds(L.latLngBounds(points),{padding:[35,35],maxZoom:18});else map.setView(points[0],17);},130);
-  toast('Showing saved walk · blue route');
+  toast('Showing selected walk · teal route');
 }
-function exitHistoryWalk(){selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;}
+function exitHistoryWalk(){
+  selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+  map.closePopup();syncSelectedWalkControls();renderExistingData();
+}
 $('walkHistoryBtn').addEventListener('click',openWalkHistory);
 $('closeWalkHistory').addEventListener('click',closeWalkHistory);
 $('closeWalkHistoryBottom').addEventListener('click',closeWalkHistory);
