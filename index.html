@@ -69,6 +69,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .rank-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e8edf3;font-size:12px}
 .rank-list li:last-child{border:0}
 .rank-list b{font-variant-numeric:tabular-nums}
+.rank-list .favorite-area{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:2px 0;font:inherit;cursor:pointer}.rank-list .favorite-area:focus-visible{outline:2px solid #1769e8;border-radius:5px}.rank-list .favorite-area span{text-decoration:underline;text-decoration-color:#b7c8de;text-underline-offset:3px}
 .utility-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .utility{min-height:72px;border:1px solid #e1e6ef;border-radius:14px;background:#f5f7fb;color:#25344d;font-size:11px;font-weight:750;padding:9px 5px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
 .utility .ico{font-size:20px}
@@ -202,7 +203,7 @@ footer{text-align:center;color:#8994a8;font-size:12px;padding:2px 0 8px}.app-ver
       <button class="utility" id="clearBtn"><span class="ico">🗑</span>Clear all</button>
     </div>
   </section>
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.0</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.1.1</span></footer>
 </div>
 <div id="dataOverlay" class="data-overlay" hidden>
   <section class="data-sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
@@ -374,13 +375,23 @@ function updateInsights(){
   $('insightDistance').textContent=miles.toFixed(1)+' mi';
   $('insightAvgDistance').textContent=walks.length?(miles/walks.length).toFixed(1)+' mi':'—';
   $('insightAvgDuration').textContent=walks.length?fmtDuration(totalMs/walks.length):'—';
-  const walkIds=new Set(walks.map(w=>String(w.id??w.startTime)));
-  const linkedPees=pees.filter(p=>p.walkId!=null&&walkIds.has(String(p.walkId)));
-  $('insightPeesPerWalk').textContent=walks.length?(linkedPees.length/walks.length).toFixed(1):'—';
+  // Match by walk ID when possible; fall back to the recorded walk time window
+  // for older/unlinked events. Each pee is counted at most once.
+  const peeCounts=new Map(walks.map(w=>[String(w.id??w.startTime),0]));
+  let linkedCount=0;
+  pees.forEach(p=>{
+    const id=p.walkId==null?null:String(p.walkId);
+    let match=id!==null?walks.find(w=>String(w.id??w.startTime)===id):null;
+    if(!match){
+      const t=new Date(p.timestamp).getTime();
+      match=walks.find(w=>t>=walkStart(w)&&t<=Number(w.endTime)+120000);
+    }
+    if(match){const key=String(match.id??match.startTime);peeCounts.set(key,(peeCounts.get(key)||0)+1);linkedCount++;}
+  });
+  $('insightPeesPerWalk').textContent=walks.length?(linkedCount/walks.length).toFixed(1):'—';
   $('insightLongestDistance').textContent=walks.length?fmtDistance(Math.max(...distances)):'—';
   $('insightLongestDuration').textContent=walks.length?fmtDuration(Math.max(...durations)):'—';
   $('insightTotalDuration').textContent=walks.length?fmtDuration(totalMs):'—';
-  const peeCounts=new Map();linkedPees.forEach(p=>{const id=String(p.walkId);peeCounts.set(id,(peeCounts.get(id)||0)+1);});
   $('insightMostPees').textContent=walks.length?Math.max(0,...peeCounts.values()):'—';
   $('perMile').textContent=miles>0?(pees.length/miles).toFixed(1):'—';
   const valid=pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
@@ -388,9 +399,31 @@ function updateInsights(){
   $('repeatCount').textContent=clusters.filter(c=>c.events.length>1).reduce((n,c)=>n+c.events.length,0);
   const list=$('favoriteList');list.innerHTML='';
   if(!clusters.length)list.innerHTML='<li>Not enough location data yet</li>';
-  else clusters.slice(0,5).forEach((c,i)=>{const li=document.createElement('li');li.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'}</b>`;list.appendChild(li);});
+  else clusters.slice(0,5).forEach((c,i)=>{const li=document.createElement('li');const btn=document.createElement('button');btn.type='button';btn.className='favorite-area';btn.innerHTML=`<span>${i+1}. ${c.center.lat.toFixed(5)}, ${c.center.lng.toFixed(5)}</span><b>${c.events.length} ${c.events.length===1?'event':'events'} ↗</b>`;btn.addEventListener('click',()=>showFavoriteArea(c));li.appendChild(btn);list.appendChild(li);});
   $('insightCallout').textContent=!walks.length&&!pees.length?'No walks or pee events recorded for this period.':`${walks.length} completed ${walks.length===1?'walk':'walks'} and ${pees.length} pee ${pees.length===1?'event':'events'} in this period.`;
   $('insightsPeriods').querySelectorAll('button').forEach(b=>{const active=b.dataset.insightPeriod===insightsPeriod;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+}
+function showFavoriteArea(cluster){
+  // Show the relevant markers regardless of the map's current date filter.
+  if(selectedPeriod!=='all'){
+    selectedPeriod='all';
+    $('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period==='all'));
+    renderPeeMarkers();refreshHeatmap();renderWalkRoutes();updateStats();
+  }
+  if(heatVisible)toggleHeatmap();
+  map.closePopup();
+  map.setView([cluster.center.lat,cluster.center.lng],17);
+  $('map').scrollIntoView({behavior:'smooth',block:'center'});
+  // Open the marker containing the selected area once zoom-based grouping updates.
+  const target=cluster.events[0];
+  renderPeeMarkers();
+  let best=null,bestDistance=Infinity;
+  peeMarkersLayer.eachLayer(layer=>{
+    if(typeof layer.getLatLng!=='function'||typeof layer.openPopup!=='function')return;
+    const distance=haversine({lat:target.lat,lng:target.lng},layer.getLatLng());
+    if(distance<bestDistance){bestDistance=distance;best=layer;}
+  });
+  if(best)best.openPopup();
 }
 renderExistingData();
 centerOnMe();
