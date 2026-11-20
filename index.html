@@ -101,7 +101,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .visit-popup{min-width:220px;max-width:260px}
 .visit-popup h3{font-size:15px;margin:0 0 8px}
 .visit-meta{font-size:12px;line-height:1.5;color:#59667a;margin-bottom:8px}
-.visit-list{max-height:155px;overflow-y:auto;border-top:1px solid #e2e7ef}
+.visit-list{max-height:110px;overflow-y:auto;border-top:1px solid #e2e7ef}
 .visit-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #e2e7ef;font-size:12px}
 .visit-delete{border:1px solid #efc4c4;border-radius:8px;background:#fff2f2;color:#a72a2a;padding:6px 9px;font-size:13px}
 #cacheBar{width:100%;height:8px;margin-top:10px;display:none}
@@ -276,7 +276,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.2.9</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.0</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -426,7 +426,7 @@ function popupForGroup(g){
   const distinctWalks=new Set(events.map(e=>e.walkId).filter(x=>x!==undefined&&x!==null));
   const dateText=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
   const heading=events.length===1?'Pee location':`${events.length} pee events nearby`;
-  const meta=`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walk IDs: ${distinctWalks.size}<br>`:''}Grouping changes with map zoom. GPS accuracy varies.`;
+  const meta=`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walk IDs: ${distinctWalks.size}<br>`:''}`;
   const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
   return `<div class="visit-popup"><h3>${heading}</h3><div class="visit-meta">${meta}</div><div class="visit-list">${rows}</div></div>`;
 }
@@ -712,7 +712,7 @@ function centerVisiblePopup(popup){
     if(!element||!mapElement)return;
     const outer=mapElement.getBoundingClientRect(),rect=element.getBoundingClientRect();
     if(!outer.width||!outer.height||!rect.width||!rect.height)return;
-    const topReserve=90,bottomReserve=52,sideReserve=14;
+    const topReserve=58,bottomReserve=20,sideReserve=14;
     const usableHeight=Math.max(60,outer.height-topReserve-bottomReserve);
     const desiredX=outer.left+outer.width/2;
     const desiredY=outer.top+topReserve+usableHeight/2;
@@ -730,7 +730,7 @@ map.on('popupopen',event=>{
     const mapHeight=map.getContainer().clientHeight;
     const popupHeight=element.getBoundingClientRect().height;
     const listHeight=list.getBoundingClientRect().height;
-    const available=Math.max(65,Math.min(155,mapHeight-28-(popupHeight-listHeight)));
+    const available=Math.max(42,Math.min(110,mapHeight-112-(popupHeight-listHeight)));
     list.style.maxHeight=`${available}px`;
   }
   centerVisiblePopup(event.popup);
