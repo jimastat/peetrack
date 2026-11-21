@@ -325,7 +325,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.2</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.2a</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -449,12 +449,16 @@ function effectiveWalkPath(walk){
   if(original.length<2)return original;
   const approved=new Map();
   for(const c of (Array.isArray(walk.gpsCorrections)?walk.gpsCorrections:[])){
-    if(!Number.isInteger(c?.pointIndex)||c.pointIndex<0||c.pointIndex>=original.length-1||!Array.isArray(c.points)||c.points.length<2)continue;
+    // GPS Review stores the ENDPOINT index of the flagged pair (i-1 -> i).
+    // Convert to the starting segment index before splicing the route.
+    // Keep stored pointIndex unchanged for compatibility with existing approvals.
+    if(!Number.isInteger(c?.pointIndex)||c.pointIndex<1||c.pointIndex>=original.length||!Array.isArray(c.points)||c.points.length<2)continue;
+    const segmentIndex=c.pointIndex-1;
     const points=c.points.map(p=>Array.isArray(p)?{lat:Number(p[0]),lng:Number(p[1])}:{lat:Number(p?.lat),lng:Number(p?.lng)});
     if(points.some(p=>!Number.isFinite(p.lat)||!Number.isFinite(p.lng)||Math.abs(p.lat)>90||Math.abs(p.lng)>180))continue;
     // Avoid joining an unrelated routing result to the recorded route.
-    if(haversine(points[0],original[c.pointIndex])>150||haversine(points[points.length-1],original[c.pointIndex+1])>150)continue;
-    approved.set(c.pointIndex,points);
+    if(haversine(points[0],original[segmentIndex])>150||haversine(points[points.length-1],original[segmentIndex+1])>150)continue;
+    approved.set(segmentIndex,points);
   }
   const result=[original[0]];
   for(let i=0;i<original.length-1;i++){
