@@ -181,6 +181,19 @@ header{position:relative;padding-right:58px}
 .walk-history-empty{padding:25px 15px;text-align:center;color:#758296;font-size:13px}
 .selected-walk-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#e6f5f4;border:1px solid #a8d7d4;border-radius:11px;padding:10px 12px;margin:12px 0;color:#006c73;font-size:12px;font-weight:750}
 .selected-walk-bar[hidden]{display:none!important}
+.selected-walk-actions{display:flex;gap:6px;flex-shrink:0}
+.gps-review-panel{background:#f4f8fc;border:1px solid #b7cde2;border-radius:11px;padding:11px 12px;margin:8px 0 12px;color:#28435b;font-size:12px}
+.gps-review-panel[hidden]{display:none!important}
+.gps-review-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:800;font-size:13px}
+.gps-review-panel p{margin:7px 0;line-height:1.45}
+.gps-review-actions{display:flex;gap:7px;margin-top:9px}
+.gps-review-actions button{min-height:38px;border:1px solid #b7cde2;border-radius:8px;background:white;color:#215b85;font-weight:750;padding:7px 10px;flex:1}
+.gps-review-actions button:disabled{opacity:.4}
+.gps-review-actions .gps-review-done{background:#e4f3f0;color:#006c73;border-color:#a8d7d4}
+.gps-review-key{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11px;color:#53677b}
+.gps-review-key span:before{content:"";display:inline-block;width:17px;height:3px;vertical-align:middle;margin-right:5px;background:#008C95}
+.gps-review-key span:last-child:before{background:#d64a44}
+
 .selected-walk-bar button{border:1px solid #9ecbc8;background:white;border-radius:8px;color:#007780;font-size:11px;font-weight:750;padding:7px 9px;flex-shrink:0}
 
 #routeModes button:disabled{opacity:.6;cursor:not-allowed}
@@ -218,7 +231,14 @@ header{position:relative;padding-right:58px}
     <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
   </section>
 
-  <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><button type="button" id="exitWalkView">Exit walk view ✕</button></div>
+  <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><div class="selected-walk-actions"><button type="button" id="reviewSelectedWalk">GPS Review</button><button type="button" id="exitWalkView">Exit walk view ✕</button></div></div>
+  <div id="gpsReviewPanel" class="gps-review-panel" hidden>
+    <div class="gps-review-heading"><span>🧭 GPS Review</span><span id="gpsReviewProgress">0 gaps</span></div>
+    <p id="gpsReviewMessage">Checking recorded GPS points…</p>
+    <div class="gps-review-key"><span>Recorded route</span><span>Suspicious gap</span></div>
+    <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
+    <p style="margin-bottom:0;color:#65788a;font-size:11px">Review only — no GPS points or walk statistics will be changed.</p>
+  </div>
   <section class="panel history-panel" aria-label="Map time filters">
     <div class="section-head"><h2>📍 Map history</h2>
     <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
@@ -277,7 +297,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.6</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.0</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -317,7 +337,7 @@ header{position:relative;padding-right:58px}
 <div id="walkHistoryOverlay" class="data-overlay" hidden>
   <section class="data-sheet walk-history-sheet" role="dialog" aria-modal="true" aria-labelledby="walkHistoryTitle">
     <div class="data-sheet-head"><div><h2 id="walkHistoryTitle">🐾 Walk History</h2><small id="walkHistoryCount">Completed walks</small></div><button type="button" id="closeWalkHistory" aria-label="Close walk history">✕</button></div>
-    <p class="walk-history-help">Select a walk to view its route, or delete a walk and optionally its associated pee events. GPS gap review will be added in a future update.</p>
+    <p class="walk-history-help">Select a walk to view its route, or delete a walk and optionally its associated pee events. GPS Review highlights possible tracking gaps without changing your saved route.</p>
     <div id="walkHistoryList" class="data-list walk-history-list"></div>
     <div class="data-sheet-foot"><span>Export a backup before deleting important records</span><button type="button" id="closeWalkHistoryBottom">Done</button></div>
   </section>
@@ -379,6 +399,8 @@ let preWalkViewMapState=null;
 let routeStyle=localStorage.getItem(ROUTE_STYLE_KEY)==='heatmap'?'heatmap':'lines';
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const selectedWalkLayer=L.layerGroup().addTo(map);
+const gpsReviewLayer=L.layerGroup().addTo(map);
+let gpsReviewState=null;
 const $=id=>document.getElementById(id);
 function setStatus(msg){$('status').textContent=msg;}
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1900);}
@@ -998,7 +1020,7 @@ function confirmWalkDeletion(){
   catch(error){alert('Could not save the deletion. No records were changed. '+error.message);return;}
   // Exit selected walk view before changing walk indices; no other walks are modified.
   if(selectedHistoryWalkIndex!==null){
-    selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+    finishGpsReview();selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
     if(preWalkViewMapState){({routeMode,routeStyle,heatVisible,selectedPeriod}=preWalkViewMapState);preWalkViewMapState=null;}
     syncSelectedWalkControls();
   }
@@ -1043,7 +1065,7 @@ function renderWalkHistory(){
     const path=Array.isArray(walk.path)?walk.path.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)):[];
     view.disabled=path.length===0;
     view.addEventListener('click',()=>showHistoryWalk(index));
-    const repair=document.createElement('button');repair.type='button';repair.textContent='GPS Review';repair.disabled=true;
+    const repair=document.createElement('button');repair.type='button';repair.textContent='GPS Review';repair.disabled=path.length<2;repair.addEventListener('click',()=>{showHistoryWalk(index);startGpsReview(index);});
     actions.append(view,repair);card.appendChild(actions);frag.appendChild(card);
   });root.appendChild(frag);
 }
@@ -1060,11 +1082,80 @@ function syncSelectedWalkControls(){
   });
   updateRouteControls();
 }
+function findGpsGaps(walk){
+  const path=Array.isArray(walk.path)?walk.path:[];
+  const gaps=[];
+  for(let i=1;i<path.length;i++){
+    const a=path[i-1],b=path[i];
+    if(!Number.isFinite(a?.lat)||!Number.isFinite(a?.lng)||!Number.isFinite(b?.lat)||!Number.isFinite(b?.lng))continue;
+    const meters=haversine(a,b);
+    const ta=Number(a.timestamp),tb=Number(b.timestamp);
+    const seconds=Number.isFinite(ta)&&Number.isFinite(tb)&&ta>0&&tb>ta?(tb-ta)/1000:null;
+    const speed=seconds!==null?meters/seconds:null;
+    const accuracy=Math.max(Number(a.accuracy)||0,Number(b.accuracy)||0);
+    const longPause=seconds!==null&&seconds>=75&&meters>=40;
+    const jump=speed!==null&&speed>3.5&&meters>=30;
+    const poorAccuracy=accuracy>=65&&meters>=45;
+    const unknownTiming=seconds===null&&meters>=180;
+    if(!longPause&&!jump&&!poorAccuracy&&!unknownTiming)continue;
+    const reasons=[];
+    if(longPause)reasons.push('long recording interval');
+    if(jump)reasons.push('unusually fast movement');
+    if(poorAccuracy)reasons.push('low GPS accuracy');
+    if(unknownTiming)reasons.push('large jump with no usable timestamps');
+    gaps.push({i,a,b,meters,seconds,reasons});
+  }
+  return gaps;
+}
+function focusGpsGap(){
+  if(!gpsReviewState)return;
+  const {gaps,position}=gpsReviewState;
+  gpsReviewLayer.clearLayers();
+  $('gpsReviewPrev').disabled=position<=0;
+  $('gpsReviewNext').disabled=position>=gaps.length-1;
+  if(!gaps.length){
+    $('gpsReviewProgress').textContent='0 flagged gaps';
+    $('gpsReviewMessage').textContent='No suspicious GPS gaps detected. This automatic check may miss some tracking problems; the saved route is unchanged.';
+    return;
+  }
+  const gap=gaps[position],a=[gap.a.lat,gap.a.lng],b=[gap.b.lat,gap.b.lng];
+  L.polyline([a,b],{color:'#fff',weight:9,opacity:.95,interactive:false}).addTo(gpsReviewLayer);
+  L.polyline([a,b],{color:'#d64a44',weight:5,dashArray:'8 7',opacity:1,interactive:false}).addTo(gpsReviewLayer);
+  [a,b].forEach(pt=>L.circleMarker(pt,{radius:6,color:'#fff',weight:2,fillColor:'#d64a44',fillOpacity:1,interactive:false}).addTo(gpsReviewLayer));
+  $('gpsReviewProgress').textContent=`Gap ${position+1} of ${gaps.length}`;
+  const distance=gap.meters>=1000?`${(gap.meters/1000).toFixed(2)} km`:`${Math.round(gap.meters)} m`;
+  const time=gap.seconds===null?'unknown interval':`${Math.round(gap.seconds)} sec`;
+  $('gpsReviewMessage').textContent=`${distance} between GPS points · ${time}. Flagged for: ${gap.reasons.join(', ')}. This may be a real route segment; inspect before making any future corrections.`;
+  map.invalidateSize();
+  const bounds=L.latLngBounds([a,b]);
+  if(bounds.isValid())map.fitBounds(bounds.pad(.8),{padding:[55,55],maxZoom:17,animate:false});
+}
+function startGpsReview(index){
+  const walk=data.walks[index];
+  if(!walk||selectedHistoryWalkIndex!==index)return;
+  gpsReviewState={index,gaps:findGpsGaps(walk),position:0};
+  $('gpsReviewPanel').hidden=false;
+  $('reviewSelectedWalk').disabled=true;
+  focusGpsGap();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function finishGpsReview(){
+  gpsReviewState=null;gpsReviewLayer.clearLayers();
+  $('gpsReviewPanel').hidden=true;$('reviewSelectedWalk').disabled=false;
+  if(selectedHistoryWalkIndex!==null){
+    const path=data.walks[selectedHistoryWalkIndex]?.path?.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng))||[];
+    if(path.length)map.fitBounds(L.latLngBounds(path.map(p=>[p.lat,p.lng])),{padding:[35,35],maxZoom:18});
+  }
+}
+$('gpsReviewPrev').addEventListener('click',()=>{if(gpsReviewState&&gpsReviewState.position>0){gpsReviewState.position--;focusGpsGap();}});
+$('gpsReviewNext').addEventListener('click',()=>{if(gpsReviewState&&gpsReviewState.position<gpsReviewState.gaps.length-1){gpsReviewState.position++;focusGpsGap();}});
+$('gpsReviewDone').addEventListener('click',finishGpsReview);
+$('reviewSelectedWalk').addEventListener('click',()=>{if(selectedHistoryWalkIndex!==null)startGpsReview(selectedHistoryWalkIndex);});
 function showHistoryWalk(index){
   const walk=data.walks[index];if(!walk)return;
   const path=(Array.isArray(walk.path)?walk.path:[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   if(!path.length)return;
-  closeWalkHistory();map.closePopup();
+  finishGpsReview();closeWalkHistory();map.closePopup();
   if(selectedHistoryWalkIndex===null){
     preWalkViewMapState={routeMode,routeStyle,heatVisible,selectedPeriod};
   }
@@ -1085,7 +1176,7 @@ function showHistoryWalk(index){
   toast('Showing selected walk · teal route');
 }
 function exitHistoryWalk(){
-  selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+  finishGpsReview();selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
   // Restore the exact map configuration from before Individual Walk View.
   // The historical pee heatmap can be toggled independently while viewing a walk.
   if(preWalkViewMapState){
