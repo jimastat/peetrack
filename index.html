@@ -277,7 +277,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.5</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.3.6</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -760,7 +760,31 @@ map.on('popupopen',event=>{
     const index=Number(button.dataset.peeIndex);
     if(!Number.isInteger(index)||index<0||index>=data.pees.length)return;
     if(!confirm('Delete this pee event? This cannot be undone.'))return;
-    data.pees.splice(index,1);saveData();map.closePopup();renderExistingData();
+    // Keep the location history open so several events can be reviewed/deleted in sequence.
+    const popup=event.popup;
+    const oldList=element.querySelector('.visit-list');
+    const oldScroll=oldList?oldList.scrollTop:0;
+    const oldIndices=Array.from(element.querySelectorAll('.visit-delete'),b=>Number(b.dataset.peeIndex));
+    const remainingIndices=new Set(oldIndices.filter(i=>i!==index).map(i=>i>index?i-1:i));
+    data.pees.splice(index,1);saveData();
+    // Rebuild the map's markers and statistics using the updated data.
+    renderExistingData();
+    if(remainingIndices.size){
+      const group=groupVisiblePees().find(g=>g.events.some(p=>remainingIndices.has(p._index)));
+      if(group){
+        let nearest=null,nearestDistance=Infinity;
+        peeMarkersLayer.eachLayer(layer=>{
+          if(typeof layer.getLatLng!=='function'||typeof layer.openPopup!=='function')return;
+          const distance=haversine({lat:group.lat,lng:group.lng},layer.getLatLng());
+          if(distance<nearestDistance){nearestDistance=distance;nearest=layer;}
+        });
+        if(nearest){
+          nearest.openPopup();
+          const nextList=nearest.getPopup()?.getElement()?.querySelector('.visit-list');
+          if(nextList)nextList.scrollTop=oldScroll;
+        }
+      }
+    }
     setStatus('Selected pee entry deleted.');toast('Pee entry deleted');
   }));
 });
