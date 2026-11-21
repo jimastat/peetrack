@@ -192,7 +192,7 @@ header{position:relative;padding-right:58px}
 .gps-review-actions .gps-review-done{background:#e4f3f0;color:#006c73;border-color:#a8d7d4}
 .gps-review-key{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11px;color:#53677b}
 .gps-review-key span:before{content:"";display:inline-block;width:17px;height:3px;vertical-align:middle;margin-right:5px;background:#008C95}
-.gps-review-key span:last-child:before{background:#d64a44}
+.gps-review-key span.gap-key:before{background:repeating-linear-gradient(to right,#d64a44 0 7px,transparent 7px 11px)}
 .gps-review-key span.proposed-key:before{background:#2375ce}
 .gps-proposal-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
 .gps-proposal-actions button{min-height:40px;flex:1;min-width:78px;border-radius:8px;border:1px solid #b7cde2;background:#fff;color:#215b85;font-weight:750;padding:7px 9px}
@@ -260,7 +260,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
   <div id="gpsReviewPanel" class="gps-review-panel" hidden>
     <div class="gps-review-heading"><span>🧭 GPS Review</span><span id="gpsReviewProgress">0 gaps</span></div>
     <p id="gpsReviewMessage">Checking recorded GPS points…</p>
-    <div class="gps-review-key"><span>Recorded route</span><span>Suspicious gap</span><span class="proposed-key">Proposed path</span></div>
+    <div class="gps-review-key"><span>Recorded route</span><span class="gap-key">GPS gap</span><span class="proposed-key">Proposed route</span></div>
     <p id="gpsProposalInfo" class="gps-proposal-info" aria-live="polite">Choose Find walking route to request a pedestrian path for this gap.</p>
     <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsSkip">Skip →</button></div>
     <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
@@ -324,7 +324,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1d</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1e</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
