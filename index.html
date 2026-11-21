@@ -193,6 +193,12 @@ header{position:relative;padding-right:58px}
 .gps-review-key{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:11px;color:#53677b}
 .gps-review-key span:before{content:"";display:inline-block;width:17px;height:3px;vertical-align:middle;margin-right:5px;background:#008C95}
 .gps-review-key span:last-child:before{background:#d64a44}
+.gps-review-key span.proposed-key:before{background:#2375ce}
+.gps-proposal-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.gps-proposal-actions button{min-height:40px;flex:1;min-width:78px;border-radius:8px;border:1px solid #b7cde2;background:#fff;color:#215b85;font-weight:750;padding:7px 9px}
+.gps-proposal-actions button:disabled{opacity:.45}
+.gps-proposal-actions #gpsAccept{background:#e0f2e8;border-color:#a6d7bb;color:#17643c}
+.gps-proposal-info{font-size:12px;color:#36546d;margin:7px 0;line-height:1.4}
 
 .selected-walk-bar button{border:1px solid #9ecbc8;background:white;border-radius:8px;color:#007780;font-size:11px;font-weight:750;padding:7px 9px;flex-shrink:0}
 
@@ -235,9 +241,11 @@ header{position:relative;padding-right:58px}
   <div id="gpsReviewPanel" class="gps-review-panel" hidden>
     <div class="gps-review-heading"><span>🧭 GPS Review</span><span id="gpsReviewProgress">0 gaps</span></div>
     <p id="gpsReviewMessage">Checking recorded GPS points…</p>
-    <div class="gps-review-key"><span>Recorded route</span><span>Suspicious gap</span></div>
+    <div class="gps-review-key"><span>Recorded route</span><span>Suspicious gap</span><span class="proposed-key">Proposed path</span></div>
+    <p id="gpsProposalInfo" class="gps-proposal-info" aria-live="polite">Choose Find walking route to request a pedestrian path for this gap.</p>
+    <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsSkip">Skip →</button></div>
     <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
-    <p style="margin-bottom:0;color:#65788a;font-size:11px">Review only — no GPS points or walk statistics will be changed.</p>
+    <p style="margin-bottom:0;color:#65788a;font-size:11px">Approved proposals are saved separately. Recorded GPS points, map routes, and statistics remain unchanged until the next update. Routing uses an online pedestrian service.</p>
   </div>
   <section class="panel history-panel" aria-label="Map time filters">
     <div class="section-head"><h2>📍 Map history</h2>
@@ -297,7 +305,7 @@ header{position:relative;padding-right:58px}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.0</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -401,6 +409,7 @@ const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().ad
 const selectedWalkLayer=L.layerGroup().addTo(map);
 const gpsReviewLayer=L.layerGroup().addTo(map);
 let gpsReviewState=null;
+let gpsProposalRequest=0;
 const $=id=>document.getElementById(id);
 function setStatus(msg){$('status').textContent=msg;}
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1900);}
@@ -1111,6 +1120,13 @@ function focusGpsGap(){
   if(!gpsReviewState)return;
   const {gaps,position}=gpsReviewState;
   gpsReviewLayer.clearLayers();
+  gpsReviewState.proposal=null;
+  gpsProposalRequest++;
+  $('gpsFindRoute').disabled=!gaps.length;
+  $('gpsAccept').disabled=true;
+  $('gpsReject').disabled=true;
+  $('gpsSkip').disabled=!gaps.length;
+  $('gpsProposalInfo').textContent='Choose Find walking route to request a pedestrian path for this gap.';
   $('gpsReviewPrev').disabled=position<=0;
   $('gpsReviewNext').disabled=position>=gaps.length-1;
   if(!gaps.length){
@@ -1125,11 +1141,95 @@ function focusGpsGap(){
   $('gpsReviewProgress').textContent=`Gap ${position+1} of ${gaps.length}`;
   const distance=gap.meters>=1000?`${(gap.meters/1000).toFixed(2)} km`:`${Math.round(gap.meters)} m`;
   const time=gap.seconds===null?'unknown interval':`${Math.round(gap.seconds)} sec`;
-  $('gpsReviewMessage').textContent=`${distance} between GPS points · ${time}. Flagged for: ${gap.reasons.join(', ')}. This may be a real route segment; inspect before making any future corrections.`;
+  $('gpsReviewMessage').textContent=`${distance} between GPS points · ${time}. Flagged for: ${gap.reasons.join(', ')}.`;
+  const saved=(data.walks[gpsReviewState.index].gpsCorrections||[]).find(c=>c.pointIndex===gap.i);
+  if(saved){$('gpsProposalInfo').textContent='Previously approved correction saved for this gap. You may request a new proposal to replace it.';drawGpsProposal(saved.points);}
   map.invalidateSize();
   const bounds=L.latLngBounds([a,b]);
   if(bounds.isValid())map.fitBounds(bounds.pad(.8),{padding:[55,55],maxZoom:17,animate:false});
 }
+// Valhalla's public pedestrian router is a best-effort external service. Never
+// silently substitute car routes or a straight line when a request fails.
+function decodeValhallaPolyline(encoded,precision=6){
+  let index=0,lat=0,lng=0;const coords=[];const factor=10**precision;
+  while(index<encoded.length){
+    const read=()=>{let result=0,shift=0,byte;do{if(index>=encoded.length)throw Error('Incomplete route geometry');byte=encoded.charCodeAt(index++)-63;result|=(byte&31)<<shift;shift+=5;if(shift>35)throw Error('Invalid route geometry');}while(byte>=32);return(result&1)?~(result>>1):(result>>1);};
+    lat+=read();lng+=read();coords.push([lat/factor,lng/factor]);
+  }
+  return coords;
+}
+function valhallaCoordinates(trip){
+  const coords=[];
+  for(const leg of trip.legs||[]){
+    const shape=leg.shape;
+    let part;
+    if(typeof shape==='string')part=decodeValhallaPolyline(shape);
+    else if(shape?.type==='LineString'&&Array.isArray(shape.coordinates))part=shape.coordinates.map(p=>[p[1],p[0]]);
+    else if(Array.isArray(shape))part=shape.map(p=>Array.isArray(p)?[p[1],p[0]]:[p.lat,p.lon]);
+    else throw Error('Routing service returned no usable path');
+    if(coords.length&&part.length)part=part.slice(1);
+    coords.push(...part);
+  }
+  if(coords.length<2||coords.some(p=>!Number.isFinite(p[0])||!Number.isFinite(p[1])))throw Error('Invalid route geometry');
+  return coords;
+}
+function drawGpsProposal(points){
+  L.polyline(points,{color:'#fff',weight:9,opacity:.95,interactive:false}).addTo(gpsReviewLayer);
+  L.polyline(points,{color:'#2375ce',weight:5,opacity:1,interactive:false}).addTo(gpsReviewLayer);
+  const gap=gpsReviewState?.gaps[gpsReviewState.position];
+  if(gap){const bounds=L.latLngBounds([...points,[gap.a.lat,gap.a.lng],[gap.b.lat,gap.b.lng]]);map.fitBounds(bounds.pad(.25),{padding:[55,55],maxZoom:17,animate:false});}
+}
+async function requestGpsProposal(){
+  const state=gpsReviewState;if(!state||!state.gaps.length)return;
+  const gap=state.gaps[state.position],request=++gpsProposalRequest;
+  const active=()=>gpsReviewState===state&&gpsProposalRequest===request;
+  $('gpsFindRoute').disabled=true;$('gpsAccept').disabled=true;$('gpsReject').disabled=true;
+  $('gpsProposalInfo').textContent='Finding a pedestrian route…';
+  try{
+    if(gap.meters>10000)throw Error('Gap exceeds 10 km; automatic routing is not suitable');
+    const params={locations:[{lat:gap.a.lat,lon:gap.a.lng,type:'break'},{lat:gap.b.lat,lon:gap.b.lng,type:'break'}],costing:'pedestrian',shape_format:'polyline6',directions_options:{units:'kilometers'}};
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),14000);
+    let response;
+    try{response=await fetch('https://valhalla1.openstreetmap.de/route?json='+encodeURIComponent(JSON.stringify(params)),{signal:controller.signal,mode:'cors'});}finally{clearTimeout(timeout);}
+    if(!active())return;
+    if(!response.ok)throw Error('Pedestrian routing service unavailable ('+response.status+')');
+    const payload=await response.json();if(!active())return;
+    if(!payload.trip?.legs?.length)throw Error(payload.error||'No pedestrian route found');
+    const points=valhallaCoordinates(payload.trip);
+    const meters=pathDistance(points.map(([lat,lng])=>({lat,lng})));
+    if(!Number.isFinite(meters)||meters<=0||meters>50000)throw Error('Returned route is not usable');
+    state.proposal={pointIndex:gap.i,points,meters,originalMeters:gap.meters};
+    // Clear previous preview by redrawing the current gap, then add the proposal.
+    gpsReviewLayer.clearLayers();
+    const a=[gap.a.lat,gap.a.lng],b=[gap.b.lat,gap.b.lng];
+    L.polyline([a,b],{color:'#fff',weight:9,interactive:false}).addTo(gpsReviewLayer);
+    L.polyline([a,b],{color:'#d64a44',weight:5,dashArray:'8 7',interactive:false}).addTo(gpsReviewLayer);
+    drawGpsProposal(points);
+    $('gpsProposalInfo').textContent=`Direct gap: ${fmtDistance(gap.meters)} · Proposed walk: ${fmtDistance(meters)}. Check the blue path before accepting.`;
+    $('gpsAccept').disabled=false;$('gpsReject').disabled=false;
+  }catch(e){
+    if(!active())return;
+    $('gpsProposalInfo').textContent='Could not find a walking route: '+(e.name==='AbortError'?'request timed out':e.message)+'. You can retry or skip.';
+  }finally{if(active())$('gpsFindRoute').disabled=false;}
+}
+function advanceGpsGap(){
+  if(!gpsReviewState)return;
+  if(gpsReviewState.position<gpsReviewState.gaps.length-1){gpsReviewState.position++;focusGpsGap();}
+  else{$('gpsProposalInfo').textContent='Last flagged gap reviewed. Select Done to return to the walk, or Previous to revisit a gap.';}
+}
+$('gpsFindRoute').addEventListener('click',requestGpsProposal);
+$('gpsAccept').addEventListener('click',()=>{
+  const state=gpsReviewState,proposal=state?.proposal;if(!proposal)return;
+  const walk=data.walks[state.index];if(!walk)return;
+  const corrections=Array.isArray(walk.gpsCorrections)?walk.gpsCorrections:[];
+  const next=corrections.filter(c=>c.pointIndex!==proposal.pointIndex);
+  next.push({...proposal,approvedAt:new Date().toISOString()});
+  const previous=walk.gpsCorrections;walk.gpsCorrections=next;
+  try{saveData();}catch(e){walk.gpsCorrections=previous;toast('Could not save correction');return;}
+  toast('Correction approved and saved');advanceGpsGap();
+});
+$('gpsReject').addEventListener('click',()=>{if(!gpsReviewState?.proposal)return;toast('Proposal rejected');advanceGpsGap();});
+$('gpsSkip').addEventListener('click',advanceGpsGap);
 function startGpsReview(index){
   const walk=data.walks[index];
   if(!walk||selectedHistoryWalkIndex!==index)return;
@@ -1140,7 +1240,7 @@ function startGpsReview(index){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function finishGpsReview(){
-  gpsReviewState=null;gpsReviewLayer.clearLayers();
+  gpsProposalRequest++;gpsReviewState=null;gpsReviewLayer.clearLayers();
   $('gpsReviewPanel').hidden=true;$('reviewSelectedWalk').disabled=false;
   if(selectedHistoryWalkIndex!==null){
     const path=data.walks[selectedHistoryWalkIndex]?.path?.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng))||[];
