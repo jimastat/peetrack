@@ -197,6 +197,7 @@ header{position:relative;padding-right:58px}
 .gps-proposal-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
 .gps-proposal-actions button{min-height:40px;flex:1;min-width:78px;border-radius:8px;border:1px solid #b7cde2;background:#fff;color:#215b85;font-weight:750;padding:7px 9px}
 .gps-proposal-actions button:disabled{opacity:.45}
+.gps-proposal-actions button[hidden]{display:none!important}
 .gps-proposal-actions #gpsAccept{background:#e0f2e8;border-color:#a6d7bb;color:#17643c}
 .gps-proposal-info{font-size:12px;color:#36546d;margin:7px 0;line-height:1.4}
 
@@ -262,9 +263,9 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     <p id="gpsReviewMessage">Checking recorded GPS points…</p>
     <div class="gps-review-key"><span>Recorded route</span><span class="gap-key">GPS gap</span><span class="proposed-key">Proposed route</span></div>
     <p id="gpsProposalInfo" class="gps-proposal-info" aria-live="polite">Choose Find walking route to request a pedestrian path for this gap.</p>
-    <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsSkip">Skip →</button></div>
+    <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsRestore" hidden disabled>Restore original</button><button type="button" id="gpsSkip">Skip →</button></div>
     <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
-    <p style="margin-bottom:0;color:#65788a;font-size:11px">Approved proposals are saved separately. Recorded GPS points, map routes, and statistics remain unchanged until the next update. Routing uses an online pedestrian service.</p>
+    <p style="margin-bottom:0;color:#65788a;font-size:11px">Approved corrections update displayed routes and distance statistics. Original GPS points are preserved; use Restore original to reverse a correction. Routing uses an online pedestrian service.</p>
   </div>
   <section class="panel history-panel" aria-label="Map time filters">
     <div class="section-head"><h2>📍 Map history</h2>
@@ -324,7 +325,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1e</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.2</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -440,6 +441,43 @@ function centerOnMe(){
 }
 function haversine(a,b){const R=6371000,toRad=x=>x*Math.PI/180;const dLat=toRad(b.lat-a.lat),dLng=toRad(b.lng-a.lng);const x=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(x));}
 function pathDistance(path){let m=0;for(let i=1;i<(path||[]).length;i++)m+=haversine(path[i-1],path[i]);return m;}
+// Build a display-only route: never mutate the recorded GPS samples. Corrections
+// are anchored to the original segment index, so they survive reloads and can
+// be individually restored. Ignore malformed or stale correction geometry.
+function effectiveWalkPath(walk){
+  const original=Array.isArray(walk?.path)?walk.path:[];
+  if(original.length<2)return original;
+  const approved=new Map();
+  for(const c of (Array.isArray(walk.gpsCorrections)?walk.gpsCorrections:[])){
+    if(!Number.isInteger(c?.pointIndex)||c.pointIndex<0||c.pointIndex>=original.length-1||!Array.isArray(c.points)||c.points.length<2)continue;
+    const points=c.points.map(p=>Array.isArray(p)?{lat:Number(p[0]),lng:Number(p[1])}:{lat:Number(p?.lat),lng:Number(p?.lng)});
+    if(points.some(p=>!Number.isFinite(p.lat)||!Number.isFinite(p.lng)||Math.abs(p.lat)>90||Math.abs(p.lng)>180))continue;
+    // Avoid joining an unrelated routing result to the recorded route.
+    if(haversine(points[0],original[c.pointIndex])>150||haversine(points[points.length-1],original[c.pointIndex+1])>150)continue;
+    approved.set(c.pointIndex,points);
+  }
+  const result=[original[0]];
+  for(let i=0;i<original.length-1;i++){
+    const replacement=approved.get(i);
+    if(replacement){result.push(...replacement.slice(1,-1));}
+    result.push(original[i+1]);
+  }
+  return result;
+}
+function walkDistance(walk){return pathDistance(effectiveWalkPath(walk));}
+function refreshSelectedWalkRoute(){
+  if(selectedHistoryWalkIndex===null)return;
+  const walk=data.walks[selectedHistoryWalkIndex];if(!walk)return;
+  const path=effectiveWalkPath(walk).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+  selectedWalkLayer.clearLayers();if(!path.length)return;
+  const points=path.map(p=>[p.lat,p.lng]);
+  L.polyline(points,{color:'#ffffff',weight:8,opacity:.95,interactive:false}).addTo(selectedWalkLayer);
+  L.polyline(points,{color:'#008C95',weight:5,opacity:1,interactive:false}).addTo(selectedWalkLayer);
+  L.circleMarker(points[0],{radius:6,color:'#fff',weight:2,fillColor:'#249b5a',fillOpacity:1}).addTo(selectedWalkLayer);
+  if(points.length>1)L.circleMarker(points[points.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#d85d32',fillOpacity:1}).addTo(selectedWalkLayer);
+  const date=walkStart(walk),count=peesForWalk(walk).length;
+  $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+count+' pee '+(count===1?'event':'events')+' · '+fmtDistance(walkDistance(walk));
+}
 function fmtDistance(m){const mi=m/1609.344;return mi<.1?`${Math.round(m)} m`:`${mi.toFixed(1)} mi`;}
 function fmtDuration(ms){const mins=Math.max(0,Math.round(ms/60000));return mins<60?`${mins} min`:`${Math.floor(mins/60)}h ${mins%60}m`;}
 
@@ -522,7 +560,7 @@ function routeHeatSegments(walks){
   const project=p=>({x:p.lng*Math.PI/180*R*Math.cos(lat0),y:p.lat*Math.PI/180*R});
   const key=(x,y)=>`${Math.floor(x/cellSize)},${Math.floor(y/cellSize)}`;
   const counts=new Map();
-  const paths=walks.map(w=>w.walk.path.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)));
+  const paths=walks.map(w=>effectiveWalkPath(w.walk).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)));
   for(const path of paths){
     const visited=new Set();
     for(let i=1;i<path.length;i++){
@@ -567,13 +605,13 @@ function renderWalkRoutes(){
   const indexed=data.walks.map((walk,index)=>({walk,index})).filter(x=>Array.isArray(x.walk.path)&&x.walk.path.length>1);
   const latest=indexed.reduce((best,x)=>!best||((walkStart(x.walk)||0)>(walkStart(best.walk)||0))?x:best,null);
   if(routeMode==='latest'&&latest){
-    L.polyline(latest.walk.path.map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.85}).addTo(walkPathsLayer);
+    L.polyline(effectiveWalkPath(latest.walk).map(p=>[p.lat,p.lng]),{color:'#1769e8',weight:3,opacity:.85}).addTo(walkPathsLayer);
   }else if(routeMode==='filtered'){
     const start=routePeriodStart();
     const filtered=indexed.filter(x=>{const t=walkStart(x.walk);return start===-Infinity||(Number.isFinite(t)&&t>=start);});
     if(routeStyle==='heatmap'){routeHeatSegments(filtered);}
     else filtered.forEach(x=>{
-      L.polyline(x.walk.path.map(p=>[p.lat,p.lng]),{color:'#727d8d',weight:2,opacity:.38}).addTo(walkPathsLayer);
+      L.polyline(effectiveWalkPath(x.walk).map(p=>[p.lat,p.lng]),{color:'#727d8d',weight:2,opacity:.38}).addTo(walkPathsLayer);
     });
   }
   updateRouteControls();
@@ -606,7 +644,7 @@ function updateStats(){
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
   if(last){
-    const dist=pathDistance(last.path||[]);
+    const dist=walkDistance(last);
 
 
 
@@ -639,7 +677,7 @@ function updateInsights(){
   const start=insightPeriodStart(),end=Date.now();
   const pees=data.pees.filter(p=>{const t=new Date(p.timestamp).getTime();return Number.isFinite(t)&&t>=start&&t<=end;});
   const walks=data.walks.filter(w=>{const t=walkStart(w);return Number.isFinite(t)&&t>=start&&t<=end&&Number.isFinite(Number(w.endTime))&&Number(w.endTime)>=t;});
-  const distances=walks.map(w=>pathDistance(w.path||[]));
+  const distances=walks.map(w=>walkDistance(w));
   const totalMeters=distances.reduce((a,b)=>a+b,0),miles=totalMeters/1609.344;
   const durations=walks.map(w=>Number(w.endTime)-walkStart(w));
   const totalMs=durations.reduce((a,b)=>a+b,0);
@@ -1031,7 +1069,7 @@ function requestWalkDeletion(index){
   const walk=data.walks[index];if(!walk)return;
   pendingWalkDeletion={walk,index};
   const date=walkStart(walk),count=associatedPeeIndices(walk).length;
-  $('walkDeleteSubtitle').textContent=`${Number.isFinite(date)?new Date(date).toLocaleString():'Undated walk'} · ${fmtDistance(pathDistance(walk.path||[]))} · ${count} pee ${count===1?'event':'events'}`;
+  $('walkDeleteSubtitle').textContent=`${Number.isFinite(date)?new Date(date).toLocaleString():'Undated walk'} · ${fmtDistance(walkDistance(walk))} · ${count} pee ${count===1?'event':'events'}`;
   $('walkDeleteBothLabel').textContent=`Delete walk and all ${count} associated pee ${count===1?'event':'events'}`;
   walkDeleteOverlay.querySelector('input[value="both"]').checked=true;
   walkDeleteOverlay.hidden=false;document.body.style.overflow='hidden';
@@ -1080,7 +1118,7 @@ function renderWalkHistory(){
     del.disabled=isWalking;
     del.addEventListener('click',()=>requestWalkDeletion(index));
     heading.appendChild(del);card.appendChild(heading);
-    const distance=pathDistance(Array.isArray(walk.path)?walk.path:[]);
+    const distance=walkDistance(walk);
     const duration=Number.isFinite(start)&&Number.isFinite(end)&&end>=start?fmtDuration(end-start):'—';
     const metrics=document.createElement('div');metrics.className='walk-history-metrics';
     const pawCount=estimatePawSteps(distance);
@@ -1145,6 +1183,7 @@ function focusGpsGap(){
   $('gpsAccept').disabled=true;
   $('gpsReject').disabled=true;
   $('gpsSkip').disabled=!gaps.length;
+  $('gpsRestore').disabled=true;$('gpsRestore').hidden=true;
   $('gpsProposalInfo').textContent='Choose Find walking route to request a pedestrian path for this gap.';
   $('gpsReviewPrev').disabled=position<=0;
   $('gpsReviewNext').disabled=position>=gaps.length-1;
@@ -1162,7 +1201,7 @@ function focusGpsGap(){
   const time=gap.seconds===null?'unknown interval':`${Math.round(gap.seconds)} sec`;
   $('gpsReviewMessage').textContent=`${distance} between GPS points · ${time}. Flagged for: ${gap.reasons.join(', ')}.`;
   const saved=(data.walks[gpsReviewState.index].gpsCorrections||[]).find(c=>c.pointIndex===gap.i);
-  if(saved){$('gpsProposalInfo').textContent='Previously approved correction saved for this gap. You may request a new proposal to replace it.';drawGpsProposal(saved.points);}
+  if(saved){$('gpsRestore').disabled=false;$('gpsRestore').hidden=false;$('gpsProposalInfo').textContent='Approved and applied · Original: '+fmtDistance(gap.meters)+' · Corrected segment: '+fmtDistance(pathDistance(saved.points.map(p=>Array.isArray(p)?{lat:p[0],lng:p[1]}:p)))+'. You can restore the original or find a replacement.';drawGpsProposal(saved.points);}
   map.invalidateSize();
   const bounds=L.latLngBounds([a,b]);
   if(bounds.isValid())map.fitBounds(bounds.pad(.8),{padding:[55,55],maxZoom:17,animate:false});
@@ -1241,7 +1280,8 @@ function advanceGpsGap(){
     $('gpsReject').disabled=true;
     $('gpsSkip').disabled=true;
     $('gpsFindRoute').disabled=true;
-    $('gpsProposalInfo').textContent='All flagged gaps reviewed. Select Done to return to the walk, or Previous to revisit a gap.';
+    $('gpsRestore').disabled=true;$('gpsRestore').hidden=true;
+    $('gpsProposalInfo').textContent='All flagged gaps reviewed. Approved corrections are applied. Select Done to return to the walk, or Previous to revisit a gap.';
   }
 }
 $('gpsFindRoute').addEventListener('click',requestGpsProposal);
@@ -1253,7 +1293,18 @@ $('gpsAccept').addEventListener('click',()=>{
   next.push({...proposal,approvedAt:new Date().toISOString()});
   const previous=walk.gpsCorrections;walk.gpsCorrections=next;
   try{saveData();}catch(e){walk.gpsCorrections=previous;toast('Could not save correction');return;}
-  toast('Correction approved and saved');advanceGpsGap();
+  refreshSelectedWalkRoute();renderExistingData();
+  toast('Correction approved and applied');advanceGpsGap();
+});
+$('gpsRestore').addEventListener('click',()=>{
+  const state=gpsReviewState;if(!state||!state.gaps.length)return;
+  const walk=data.walks[state.index],gap=state.gaps[state.position];if(!walk||!gap)return;
+  const previous=walk.gpsCorrections;
+  const next=(Array.isArray(previous)?previous:[]).filter(c=>c.pointIndex!==gap.i);
+  if(next.length===(Array.isArray(previous)?previous.length:0))return;
+  walk.gpsCorrections=next;
+  try{saveData();}catch(e){walk.gpsCorrections=previous;toast('Could not restore original route');return;}
+  refreshSelectedWalkRoute();renderExistingData();focusGpsGap();toast('Original GPS segment restored');
 });
 $('gpsReject').addEventListener('click',()=>{if(!gpsReviewState?.proposal)return;toast('Proposal rejected');advanceGpsGap();});
 $('gpsSkip').addEventListener('click',advanceGpsGap);
@@ -1278,7 +1329,8 @@ function finishGpsReview(){
   if(heatVisible&&heatLayer&&!map.hasLayer(heatLayer))heatLayer.addTo(map);
   requestAnimationFrame(()=>map.invalidateSize());
   if(selectedHistoryWalkIndex!==null){
-    const path=data.walks[selectedHistoryWalkIndex]?.path?.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng))||[];
+    refreshSelectedWalkRoute();renderExistingData();
+    const path=effectiveWalkPath(data.walks[selectedHistoryWalkIndex]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
     if(path.length)map.fitBounds(L.latLngBounds(path.map(p=>[p.lat,p.lng])),{padding:[35,35],maxZoom:18});
   }
 }
@@ -1288,7 +1340,7 @@ $('gpsReviewDone').addEventListener('click',finishGpsReview);
 $('reviewSelectedWalk').addEventListener('click',()=>{if(selectedHistoryWalkIndex!==null)startGpsReview(selectedHistoryWalkIndex);});
 function showHistoryWalk(index){
   const walk=data.walks[index];if(!walk)return;
-  const path=(Array.isArray(walk.path)?walk.path:[]).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+  const path=effectiveWalkPath(walk).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
   if(!path.length)return;
   finishGpsReview();closeWalkHistory();map.closePopup();
   if(selectedHistoryWalkIndex===null){
@@ -1303,7 +1355,7 @@ function showHistoryWalk(index){
   L.circleMarker(points[0],{radius:6,color:'#fff',weight:2,fillColor:'#249b5a',fillOpacity:1}).addTo(selectedWalkLayer);
   if(points.length>1)L.circleMarker(points[points.length-1],{radius:6,color:'#fff',weight:2,fillColor:'#d85d32',fillOpacity:1}).addTo(selectedWalkLayer);
   const date=walkStart(walk),peeCount=peesForWalk(walk).length;
-  $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+peeCount+' pee '+(peeCount===1?'event':'events')+' · '+fmtDistance(pathDistance(path));
+  $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+peeCount+' pee '+(peeCount===1?'event':'events')+' · '+fmtDistance(walkDistance(walk));
   $('selectedWalkBar').hidden=false;
   syncSelectedWalkControls();renderExistingData();
   window.scrollTo({top:0,behavior:'smooth'});
