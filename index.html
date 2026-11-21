@@ -218,8 +218,13 @@ header{position:relative;padding-right:58px}
 }
 
 /* Compact GPS review: keep map and review actions together on phone screens. */
+/* GPS review is a focused route-editing workspace; preserve normal map preferences. */
+body.gps-review-active .map-actions,
+body.gps-review-active #mapCount,
+body.gps-review-active #peeDensityLegend,
+body.gps-review-active #walkDensityLegend{display:none!important}
 body.gps-review-active #app{gap:6px}
-body.gps-review-active #map{height:clamp(205px,31dvh,290px)}
+body.gps-review-active #map{height:clamp(215px,31dvh + 10px,300px)}
 body.gps-review-active .selected-walk-bar{margin:0;padding:6px 9px;gap:6px;min-height:38px}
 body.gps-review-active .selected-walk-actions{gap:5px}
 body.gps-review-active .selected-walk-bar button{padding:6px 7px;min-height:32px}
@@ -229,7 +234,7 @@ body.gps-review-active .gps-review-key{gap:9px;font-size:10px}
 body.gps-review-active .gps-review-actions,body.gps-review-active .gps-proposal-actions{gap:5px;margin-top:6px}
 body.gps-review-active .gps-review-actions button,body.gps-review-active .gps-proposal-actions button{min-height:34px;padding:5px 6px;font-size:11px}
 body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height:1.25}
-@media(max-width:420px){body.gps-review-active .selected-walk-bar{font-size:11px}body.gps-review-active .selected-walk-bar button{font-size:10px}body.gps-review-active #map{height:clamp(205px,30dvh,260px)}}
+@media(max-width:420px){body.gps-review-active .selected-walk-bar{font-size:11px}body.gps-review-active .selected-walk-bar button{font-size:10px}body.gps-review-active #map{height:clamp(215px,30dvh + 10px,270px)}}
 </style>
 </head>
   
@@ -319,7 +324,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1b</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1c</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -590,7 +595,7 @@ function refreshHeatmap(){
   // Historical context is independent of the selected walk; respect the date filter.
   const points=(selectedHistoryWalkIndex!==null?historicalPeesForHeatmap():visiblePees()).map(p=>[p.lat,p.lng,.65]);
   heatLayer=L.heatLayer(points,{radius:31,blur:24,maxZoom:18,gradient:{.2:'#273dff',.45:'#20d5e8',.62:'#45e65b',.8:'#ffe02e',1:'#f22b19'}});
-  if(heatVisible){heatLayer.addTo(map);if(selectedHistoryWalkIndex!==null&&heatLayer.setOptions)heatLayer.setOptions({minOpacity:.25});}
+  if(heatVisible&&!gpsReviewState){heatLayer.addTo(map);if(selectedHistoryWalkIndex!==null&&heatLayer.setOptions)heatLayer.setOptions({minOpacity:.25});}
 }
 function updateStats(){
 
@@ -1257,6 +1262,9 @@ function startGpsReview(index){
   gpsReviewState={index,gaps:findGpsGaps(walk),position:0};
   $('gpsReviewPanel').hidden=false;
   document.body.classList.add('gps-review-active');
+  // Hide the historical pee heatmap without changing the user's saved preference.
+  if(heatLayer&&map.hasLayer(heatLayer))map.removeLayer(heatLayer);
+  peeMarkersLayer.addTo(map);
   $('reviewSelectedWalk').disabled=true;
   focusGpsGap();
   requestAnimationFrame(()=>{map.invalidateSize();focusGpsGap();});
@@ -1265,6 +1273,8 @@ function startGpsReview(index){
 function finishGpsReview(){
   gpsProposalRequest++;gpsReviewState=null;gpsReviewLayer.clearLayers();
   $('gpsReviewPanel').hidden=true;document.body.classList.remove('gps-review-active');$('reviewSelectedWalk').disabled=false;
+  // Restore the historical heatmap exactly as it was before GPS review.
+  if(heatVisible&&heatLayer&&!map.hasLayer(heatLayer))heatLayer.addTo(map);
   requestAnimationFrame(()=>map.invalidateSize());
   if(selectedHistoryWalkIndex!==null){
     const path=data.walks[selectedHistoryWalkIndex]?.path?.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng))||[];
