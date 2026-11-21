@@ -324,7 +324,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1c</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.1d</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -1240,6 +1240,7 @@ function advanceGpsGap(){
     $('gpsAccept').disabled=true;
     $('gpsReject').disabled=true;
     $('gpsSkip').disabled=true;
+    $('gpsFindRoute').disabled=true;
     $('gpsProposalInfo').textContent='All flagged gaps reviewed. Select Done to return to the walk, or Previous to revisit a gap.';
   }
 }
