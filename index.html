@@ -365,7 +365,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.8a</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.8b</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1380,7 +1380,12 @@ function renderWalkHistory(){
     actions.append(view,repair);card.appendChild(actions);frag.appendChild(card);
   });root.appendChild(frag);
 }
-function openWalkHistory(){renderWalkHistory();walkHistoryOverlay.hidden=false;document.body.style.overflow='hidden';}
+function openWalkHistory(){
+  // Opening Walk History ends navigation originating from an Insights record shortcut.
+  returnToInsightsAfterWalk=false;
+  $('exitWalkView').textContent='Exit walk view ✕';
+  renderWalkHistory();walkHistoryOverlay.hidden=false;document.body.style.overflow='hidden';
+}
 function closeWalkHistory(){walkHistoryOverlay.hidden=true;document.body.style.overflow='';}
 function syncSelectedWalkControls(){
   const active=selectedHistoryWalkIndex!==null;
