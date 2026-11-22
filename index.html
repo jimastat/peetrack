@@ -206,6 +206,8 @@ header{position:relative;padding-right:58px}
 #routeModes button:disabled{opacity:.6;cursor:not-allowed}
 #selectedWalkNote{font-size:11px;color:#007780;font-weight:650;margin:6px 0 0}
 
+/* Ensure selected-walk filter controls really disappear despite flex layout rules. */
+#mapFilters[hidden],#routeSelector[hidden]{display:none!important}
 /* v1.2.4: Stevie header stays visible while the document scrolls. */
 #app > header {
   position: sticky;
@@ -251,7 +253,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     <div id="map"></div>
     <div class="map-actions">
       <button id="locateBtn" aria-label="Center map on current location" title="Center on me">➤</button>
-      <button id="mapLayerBtn" aria-label="Toggle heatmap" title="Toggle heatmap">🔥</button>
+      <button id="mapLayerBtn" aria-label="Pee display: Heatmap. Tap for clusters" title="Pee display: Heatmap">🔥</button>
     </div>
     <div class="map-legend" id="peeDensityLegend"><div>Pee density</div><div class="gradient"></div><div style="display:flex;justify-content:space-between;color:#748096;font-size:10px;font-weight:500;margin-top:3px"><span>Less frequent</span><span>More frequent</span></div></div>
     <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
@@ -325,7 +327,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.2a</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.3</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -420,7 +422,11 @@ function estimatePawSteps(meters){return Math.round(Math.max(0,meters)/1609.344*
 const map=L.map('map',{tap:true,zoomControl:false}).setView([45.5231,-122.6765],13);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
-let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=true,currentWalkId=null,selectedPeriod="all",routeMode="latest";
+const PEE_MODE_KEY='peeTrackerPeeDisplayMode';
+let peeMode=['heatmap','clusters','off'].includes(localStorage.getItem(PEE_MODE_KEY))?localStorage.getItem(PEE_MODE_KEY):'heatmap';
+// Remember the preferred pee layer while filtered walking routes are shown.
+let peeModeBeforeFiltered=null;
+let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,isWalking=false,heatLayer=null,heatVisible=peeMode==='heatmap',currentWalkId=null,selectedPeriod="all",routeMode="latest";
 const ROUTE_STYLE_KEY='peeTrackerRouteStyle';
 let selectedHistoryWalkIndex=null;
 let preWalkViewMapState=null;
@@ -621,11 +627,49 @@ function renderWalkRoutes(){
   updateRouteControls();
   if(!map.hasLayer(walkPathsLayer))walkPathsLayer.addTo(map);
 }
+function syncPeeDisplay(){
+  heatVisible=peeMode==='heatmap';
+  const btn=$('mapLayerBtn');
+  const labels={heatmap:['🔥','Heatmap','Clusters'],clusters:['pin','Clusters','Off'],off:['ban','Off','Heatmap']};
+  const [symbol,label,next]=labels[peeMode];
+  const iconSvg={
+    pin:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" fill="#E5B700" stroke="#8A6800" stroke-width="1.5"/><circle cx="12" cy="10" r="2.8" fill="#FFF7CE"/></svg>',
+    ban:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><circle cx="12" cy="12" r="9" fill="none" stroke="#D64A44" stroke-width="3"/><path d="M5.7 5.7 18.3 18.3" stroke="#D64A44" stroke-width="3" stroke-linecap="round"/></svg>'
+  };
+  if(iconSvg[symbol])btn.innerHTML=iconSvg[symbol];else btn.textContent=symbol;
+  btn.setAttribute('aria-label',`Pee display: ${label}. Tap for ${next}`);
+  btn.title=`Pee display: ${label} · tap for ${next}`;
+  btn.dataset.mode=peeMode;
+  $('peeDensityLegend').hidden=!heatVisible;
+  if(heatLayer){if(heatVisible&&!gpsReviewState){if(!map.hasLayer(heatLayer))heatLayer.addTo(map);}else map.removeLayer(heatLayer);}
+  // During GPS Review, keep the selected walk's markers as before.
+  const markers=gpsReviewState||peeMode==='clusters'||(heatVisible&&selectedHistoryWalkIndex!==null);
+  if(markers){if(!map.hasLayer(peeMarkersLayer))peeMarkersLayer.addTo(map);}
+  else if(map.hasLayer(peeMarkersLayer))peeMarkersLayer.remove();
+}
+function setPeeMode(mode,{persist=true}={}){
+  peeMode=mode;
+  if(persist)localStorage.setItem(PEE_MODE_KEY,mode);
+  syncPeeDisplay();
+  if(heatVisible)refreshHeatmap();
+  updateStats();
+}
+function syncPeeModeForRouteChange(){
+  // Filtered Lines and Heatmap start with a clear pee layer, but users can
+  // still manually cycle the pee button while looking at either route view.
+  if(routeMode==='filtered'){
+    if(peeModeBeforeFiltered===null)peeModeBeforeFiltered=peeMode;
+    setPeeMode('off',{persist:false});
+  }else if(peeModeBeforeFiltered!==null){
+    const restore=peeModeBeforeFiltered;
+    peeModeBeforeFiltered=null;
+    setPeeMode(restore,{persist:false});
+  }
+}
 function renderExistingData(){
   renderWalkRoutes();
   renderPeeMarkers();refreshHeatmap();
-  if(heatVisible&&selectedHistoryWalkIndex===null)peeMarkersLayer.remove();
-  else peeMarkersLayer.addTo(map);
+  syncPeeDisplay();
   updateStats();
 }
 function historicalPeesForHeatmap(){
@@ -643,8 +687,8 @@ function updateStats(){
 
   $('undoPeeBtn').disabled=data.pees.length===0;
   if(selectedHistoryWalkIndex!==null){
-    $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${heatVisible?'historical heatmap + markers':'grouped markers'}</span>`;
-  }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${heatVisible?'heatmap':'grouped markers'}</span>`;
+    $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${peeMode==='heatmap'?'historical heatmap + markers':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
+  }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${peeMode==='heatmap'?'heatmap':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
   if(last){
@@ -730,7 +774,7 @@ function showFavoriteArea(cluster){
     $('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period==='all'));
     renderPeeMarkers();refreshHeatmap();renderWalkRoutes();updateStats();
   }
-  if(heatVisible)toggleHeatmap();
+  if(peeMode!=='clusters')setPeeMode('clusters');
   map.closePopup();
   map.setView([cluster.center.lat,cluster.center.lng],17);
   $('map').scrollIntoView({behavior:'smooth',block:'center'});
@@ -881,7 +925,7 @@ map.on('popupopen',event=>{
   }));
 });
 map.on('popupclose',()=>{$('mapCount').hidden=false;});
-map.on('zoomend',()=>{if(!heatVisible||selectedHistoryWalkIndex!==null)renderPeeMarkers();});
+map.on('zoomend',()=>{if(peeMode==='clusters'||selectedHistoryWalkIndex!==null)renderPeeMarkers();});
 $('mapFilters').addEventListener('click',event=>{
   const button=event.target.closest('button[data-period]');if(!button)return;
   selectedPeriod=button.dataset.period;
@@ -893,13 +937,7 @@ $('routeModes').addEventListener('click',event=>{
   const button=event.target.closest('button[data-route]');if(!button)return;
   if(selectedHistoryWalkIndex!==null)return;
   routeMode=button.dataset.route;
-  if(routeMode==='filtered'&&routeStyle==='heatmap'&&heatVisible){
-    heatVisible=false;
-    $('peeDensityLegend').hidden=true;
-    if(heatLayer)map.removeLayer(heatLayer);
-    peeMarkersLayer.addTo(map);
-    updateStats();
-  }
+  syncPeeModeForRouteChange();
   $('routeModes').querySelectorAll('button').forEach(b=>{const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   renderWalkRoutes();
   setStatus(routeMode==='off'?'Saved walk routes hidden.':routeMode==='latest'?'Showing most recent saved walk.':'Showing historical routes for the selected period.');
@@ -909,24 +947,18 @@ $('routeStyles').addEventListener('click',event=>{
   if(selectedHistoryWalkIndex!==null)return;
   routeStyle=button.dataset.style;
   localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);
-  if(routeStyle==='heatmap'&&heatVisible){
-    heatVisible=false;$('peeDensityLegend').hidden=true;
-    if(heatLayer)map.removeLayer(heatLayer);
-    peeMarkersLayer.addTo(map);updateStats();
-  }
+  if(routeMode==='filtered'&&routeStyle==='heatmap'&&peeMode==='heatmap')setPeeMode('off',{persist:false});
   renderWalkRoutes();
   setStatus(routeStyle==='heatmap'?'Showing route frequency for the selected period.':'Showing individual filtered routes.');
 });
 function toggleHeatmap(){
-  // Pee density and walk density are never displayed simultaneously.
-  if(selectedHistoryWalkIndex===null&&!heatVisible&&routeMode==='filtered'&&routeStyle==='heatmap'){
+  const next={heatmap:'clusters',clusters:'off',off:'heatmap'}[peeMode];
+  // The two density heatmaps are intentionally mutually exclusive.
+  if(next==='heatmap'&&selectedHistoryWalkIndex===null&&routeMode==='filtered'&&routeStyle==='heatmap'){
     routeStyle='lines';localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);renderWalkRoutes();
   }
-  heatVisible=!heatVisible;
-  $('peeDensityLegend').hidden=!heatVisible;
-  if(heatVisible){if(selectedHistoryWalkIndex===null)peeMarkersLayer.remove();else peeMarkersLayer.addTo(map);refreshHeatmap();}
-  else{if(heatLayer)map.removeLayer(heatLayer);peeMarkersLayer.addTo(map);}
-  updateStats();setStatus(heatVisible?'Heatmap view on':'Grouped pee markers shown');
+  setPeeMode(next,{persist:peeModeBeforeFiltered===null});
+  setStatus(`Pee display: ${next==='heatmap'?'Heatmap':next==='clusters'?'Clusters':'Off'}`);
 }
 $('mapLayerBtn').addEventListener('click',toggleHeatmap);
 $('locateBtn').addEventListener('click',centerOnMe);
@@ -1030,7 +1062,7 @@ function renderDataList(){
     const locate=document.createElement('button');locate.type='button';locate.textContent='Map';locate.disabled=!Number.isFinite(p.lat)||!Number.isFinite(p.lng);
     locate.addEventListener('click',()=>{
       closeDataList();selectedPeriod='all';$('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period==='all'));
-      if(heatVisible)toggleHeatmap();
+      if(peeMode!=='clusters')setPeeMode('clusters');
       renderPeeMarkers();refreshHeatmap();renderWalkRoutes();updateStats();
       map.setView([p.lat,p.lng],19);setTimeout(()=>map.invalidateSize(),80);
       window.scrollTo({top:0,behavior:'smooth'});toast('Showing selected pee location');
@@ -1091,7 +1123,7 @@ function confirmWalkDeletion(){
   // Exit selected walk view before changing walk indices; no other walks are modified.
   if(selectedHistoryWalkIndex!==null){
     finishGpsReview();selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
-    if(preWalkViewMapState){({routeMode,routeStyle,heatVisible,selectedPeriod}=preWalkViewMapState);preWalkViewMapState=null;}
+    if(preWalkViewMapState){({routeMode,routeStyle,heatVisible,peeMode,selectedPeriod}=preWalkViewMapState);preWalkViewMapState=null;}
     syncSelectedWalkControls();
   }
   data=next;closeWalkDelete();renderWalkHistory();map.closePopup();renderExistingData();
@@ -1144,6 +1176,9 @@ function closeWalkHistory(){walkHistoryOverlay.hidden=true;document.body.style.o
 function syncSelectedWalkControls(){
   const active=selectedHistoryWalkIndex!==null;
   $('selectedWalkNote').hidden=!active;
+  // Selected walk has its own route; hide unrelated date and route filters.
+  $('mapFilters').hidden=active;
+  $('routeSelector').hidden=active;
   $('routeModes').querySelectorAll('button').forEach(b=>{
     b.disabled=active;
     const selected=active?b.dataset.route==='off':b.dataset.route===routeMode;
@@ -1167,12 +1202,19 @@ function findGpsGaps(walk){
     const jump=speed!==null&&speed>3.5&&meters>=30;
     const poorAccuracy=accuracy>=65&&meters>=45;
     const unknownTiming=seconds===null&&meters>=180;
-    if(!longPause&&!jump&&!poorAccuracy&&!unknownTiming)continue;
+    // A suspended phone can leave a straight line across houses even when
+    // elapsed time and apparent speed look plausible. Review long chords as
+    // potential gaps; never apply a correction without user approval.
+    const longStraightSegment=meters>=85;
+    const moderateStraightSegment=meters>=55&&seconds!==null&&seconds>=35;
+    if(!longPause&&!jump&&!poorAccuracy&&!unknownTiming&&!longStraightSegment&&!moderateStraightSegment)continue;
     const reasons=[];
     if(longPause)reasons.push('long recording interval');
     if(jump)reasons.push('unusually fast movement');
     if(poorAccuracy)reasons.push('low GPS accuracy');
     if(unknownTiming)reasons.push('large jump with no usable timestamps');
+    if((longStraightSegment||moderateStraightSegment)&&!longPause&&!jump&&!poorAccuracy&&!unknownTiming)
+      reasons.push('long straight segment (possible missing GPS points)');
     gaps.push({i,a,b,meters,seconds,reasons});
   }
   return gaps;
@@ -1330,7 +1372,7 @@ function finishGpsReview(){
   gpsProposalRequest++;gpsReviewState=null;gpsReviewLayer.clearLayers();
   $('gpsReviewPanel').hidden=true;document.body.classList.remove('gps-review-active');$('reviewSelectedWalk').disabled=false;
   // Restore the historical heatmap exactly as it was before GPS review.
-  if(heatVisible&&heatLayer&&!map.hasLayer(heatLayer))heatLayer.addTo(map);
+  syncPeeDisplay();
   requestAnimationFrame(()=>map.invalidateSize());
   if(selectedHistoryWalkIndex!==null){
     refreshSelectedWalkRoute();renderExistingData();
@@ -1348,7 +1390,7 @@ function showHistoryWalk(index){
   if(!path.length)return;
   finishGpsReview();closeWalkHistory();map.closePopup();
   if(selectedHistoryWalkIndex===null){
-    preWalkViewMapState={routeMode,routeStyle,heatVisible,selectedPeriod};
+    preWalkViewMapState={routeMode,routeStyle,heatVisible,peeMode,selectedPeriod};
   }
   selectedHistoryWalkIndex=index;
   selectedWalkLayer.clearLayers();
@@ -1371,14 +1413,14 @@ function exitHistoryWalk(){
   // Restore the exact map configuration from before Individual Walk View.
   // The historical pee heatmap can be toggled independently while viewing a walk.
   if(preWalkViewMapState){
-    ({routeMode,routeStyle,heatVisible,selectedPeriod}=preWalkViewMapState);
+    ({routeMode,routeStyle,heatVisible,peeMode,selectedPeriod}=preWalkViewMapState);
     preWalkViewMapState=null;
     $('routeModes').querySelectorAll('button').forEach(b=>{
       const active=b.dataset.route===routeMode;
       b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
     });
     $('mapFilters').querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.period===selectedPeriod));
-    $('peeDensityLegend').hidden=!heatVisible;
+    syncPeeDisplay();
   }
   map.closePopup();syncSelectedWalkControls();renderExistingData();
 }
