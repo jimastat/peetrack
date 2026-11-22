@@ -376,7 +376,7 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9b</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9c</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1073,7 +1073,7 @@ function confirmPeeRecorded(){
     button.classList.remove('pee-confirmed');
     button.textContent='📍  Pee Here!';
     peeConfirmTimer=null;
-  },1500);
+  },1000);
 }
 $('peeBtn').addEventListener('click',()=>logPeeEvent().then(confirmPeeRecorded).catch(()=>{}));
 $('undoPeeBtn').addEventListener('click',()=>{
