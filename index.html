@@ -53,6 +53,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 #peeBtn{grid-column:1/-1;background:linear-gradient(135deg,#f4bd43,#e59b13);color:#172235;min-height:68px;font-size:19px}
 #peeBtn.pee-confirmed{background:linear-gradient(135deg,#329d5b,#207a43);color:#fff;box-shadow:inset 0 -3px 0 #00000014}
 #undoPeeBtn{grid-column:1/-1;min-height:43px;background:#eef2f8;color:#36475f;border:1px solid #d7e0eb;box-shadow:none;font-size:13px}
+#undoPeeBtn.undo-confirmed,#undoPeeBtn.undo-confirmed:disabled{background:#287d8b;color:#fff;border-color:#287d8b;opacity:1}
 .action:disabled{opacity:.42;cursor:not-allowed}
 .status-line{font-size:12px;color:var(--muted);text-align:center;min-height:17px;margin-top:9px}
 .stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
@@ -376,7 +377,7 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9c</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9d</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1073,13 +1074,26 @@ function confirmPeeRecorded(){
     button.classList.remove('pee-confirmed');
     button.textContent='📍  Pee Here!';
     peeConfirmTimer=null;
-  },1000);
+  },800);
 }
 $('peeBtn').addEventListener('click',()=>logPeeEvent().then(confirmPeeRecorded).catch(()=>{}));
+let undoPeeConfirmTimer=null;
+function confirmPeeUndone(){
+  const button=$('undoPeeBtn');
+  if(undoPeeConfirmTimer!==null)clearTimeout(undoPeeConfirmTimer);
+  button.classList.add('undo-confirmed');
+  button.textContent='✓ Last Pee Undone!';
+  undoPeeConfirmTimer=setTimeout(()=>{
+    button.classList.remove('undo-confirmed');
+    button.textContent='↶  Undo last pee';
+    undoPeeConfirmTimer=null;
+  },800);
+}
 $('undoPeeBtn').addEventListener('click',()=>{
   if(!data.pees.length)return;
   data.pees.pop();saveData();map.closePopup();renderExistingData();
   setStatus('Last pee entry removed.');toast('Last pee undone');
+  confirmPeeUndone();
 });
 // Delete a single visit from a location history popup, using its original storage index.
 // Center the actual popup within the map's usable viewport, not the marker.
