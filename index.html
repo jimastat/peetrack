@@ -210,6 +210,14 @@ header{position:relative;padding-right:64px}
 .gps-proposal-actions button[hidden]{display:none!important}
 .gps-proposal-actions #gpsAccept{background:#e0f2e8;border-color:#a6d7bb;color:#17643c}
 .gps-proposal-info{font-size:12px;color:#36546d;margin:7px 0;line-height:1.4}
+/* v1.4.9b: stable GPS Review action positions across all gap states. */
+.gps-review-panel .gps-proposal-actions{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.gps-review-panel .gps-proposal-actions button{min-width:0;width:100%;min-height:43px;line-height:1.15;margin:0;padding:6px 4px;grid-column:span 2}
+.gps-review-panel .gps-proposal-actions #gpsFindRoute,.gps-review-panel .gps-proposal-actions #gpsRestore{grid-column:span 3}
+.gps-review-panel .gps-review-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.gps-review-panel .gps-review-actions button{min-width:0;min-height:43px;line-height:1.15;padding:6px 4px}
+.gps-review-panel .gps-proposal-actions button[hidden]{display:block!important;visibility:hidden;pointer-events:none}
+
 
 .selected-walk-bar button{border:1px solid #9ecbc8;background:white;border-radius:8px;color:#007780;font-size:11px;font-weight:750;padding:7px 9px;flex-shrink:0}
 
@@ -248,6 +256,8 @@ body.gps-review-active .gps-review-actions,body.gps-review-active .gps-proposal-
 body.gps-review-active .gps-review-actions button,body.gps-review-active .gps-proposal-actions button{min-height:34px;padding:5px 6px;font-size:11px}
 body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height:1.25}
 @media(max-width:420px){body.gps-review-active .selected-walk-bar{font-size:11px}body.gps-review-active .selected-walk-bar button{font-size:10px}body.gps-review-active #map{height:clamp(215px,30dvh + 10px,270px)}}
+body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-review-active .gps-review-panel .gps-review-actions button{min-height:42px;font-size:11px;padding:6px 4px}
+
 
 /* Artwork adapted directly from original C and D icon concept sheet. */
 .pee-map-art{display:block;width:23px;height:23px;object-fit:contain;flex:none}
@@ -302,7 +312,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     <p id="gpsReviewMessage">Checking recorded GPS points…</p>
     <div class="gps-review-key"><span>Recorded route</span><span class="gap-key">GPS gap</span><span class="proposed-key">Proposed route</span></div>
     <p id="gpsProposalInfo" class="gps-proposal-info" aria-live="polite">Choose Find walking route to request a pedestrian path for this gap.</p>
-    <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsRestore" hidden disabled>Restore original</button><button type="button" id="gpsSkip">Skip →</button></div>
+    <div class="gps-proposal-actions"><button type="button" id="gpsFindRoute">Find walking route</button><button type="button" id="gpsRestore" disabled>Restore original</button><button type="button" id="gpsAccept" disabled>Accept</button><button type="button" id="gpsReject" disabled>Reject</button><button type="button" id="gpsSkip">Skip →</button></div>
     <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
     <p style="margin-bottom:0;color:#65788a;font-size:11px">Approved corrections update displayed routes and distance statistics. Original GPS points are preserved; use Restore original to reverse a correction. Routing uses an online pedestrian service.</p>
   </div>
@@ -366,7 +376,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9a</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9b</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1448,6 +1458,17 @@ function findGpsGaps(walk){
   }
   return gaps;
 }
+function frameGpsReviewGap(extraPoints=[]){
+  if(!gpsReviewState||!gpsReviewState.gaps.length)return;
+  const gap=gpsReviewState.gaps[gpsReviewState.position];
+  if(!gap)return;
+  const points=[[gap.a.lat,gap.a.lng],[gap.b.lat,gap.b.lng],...extraPoints.map(p=>Array.isArray(p)?p:[p.lat,p.lng])];
+  const bounds=L.latLngBounds(points.filter(p=>p&&Number.isFinite(p[0])&&Number.isFinite(p[1])));
+  if(!bounds.isValid())return;
+  // Same padding and zoom cap for all gap states; do not let a short gap zoom in excessively.
+  map.invalidateSize();
+  map.fitBounds(bounds,{padding:[45,45],maxZoom:16,animate:false});
+}
 function focusGpsGap(){
   if(!gpsReviewState)return;
   const {gaps,position}=gpsReviewState;
@@ -1458,7 +1479,7 @@ function focusGpsGap(){
   $('gpsAccept').disabled=true;
   $('gpsReject').disabled=true;
   $('gpsSkip').disabled=!gaps.length;
-  $('gpsRestore').disabled=true;$('gpsRestore').hidden=true;
+  $('gpsRestore').disabled=true;
   $('gpsProposalInfo').textContent='Choose Find walking route to request a pedestrian path for this gap.';
   $('gpsReviewPrev').disabled=position<=0;
   $('gpsReviewNext').disabled=position>=gaps.length-1;
@@ -1476,10 +1497,8 @@ function focusGpsGap(){
   const time=gap.seconds===null?'unknown interval':`${Math.round(gap.seconds)} sec`;
   $('gpsReviewMessage').textContent=`${distance} between GPS points · ${time}. Flagged for: ${gap.reasons.join(', ')}.`;
   const saved=(data.walks[gpsReviewState.index].gpsCorrections||[]).find(c=>c.pointIndex===gap.i);
-  if(saved){$('gpsRestore').disabled=false;$('gpsRestore').hidden=false;$('gpsProposalInfo').textContent='Approved and applied · Original: '+fmtDistance(gap.meters)+' · Corrected segment: '+fmtDistance(pathDistance(saved.points.map(p=>Array.isArray(p)?{lat:p[0],lng:p[1]}:p)))+'. You can restore the original or find a replacement.';drawGpsProposal(saved.points);}
-  map.invalidateSize();
-  const bounds=L.latLngBounds([a,b]);
-  if(bounds.isValid())map.fitBounds(bounds.pad(.8),{padding:[55,55],maxZoom:17,animate:false});
+  if(saved){$('gpsRestore').disabled=false;$('gpsProposalInfo').textContent='Approved and applied · Original: '+fmtDistance(gap.meters)+' · Corrected segment: '+fmtDistance(pathDistance(saved.points.map(p=>Array.isArray(p)?{lat:p[0],lng:p[1]}:p)))+'. You can restore the original or find a replacement.';drawGpsProposal(saved.points);}
+  frameGpsReviewGap(saved?.points||[]);
 }
 // Valhalla's public pedestrian router is a best-effort external service. Never
 // silently substitute car routes or a straight line when a request fails.
@@ -1510,7 +1529,7 @@ function drawGpsProposal(points){
   L.polyline(points,{color:'#fff',weight:9,opacity:.95,interactive:false}).addTo(gpsReviewLayer);
   L.polyline(points,{color:'#2375ce',weight:5,opacity:1,interactive:false}).addTo(gpsReviewLayer);
   const gap=gpsReviewState?.gaps[gpsReviewState.position];
-  if(gap){const bounds=L.latLngBounds([...points,[gap.a.lat,gap.a.lng],[gap.b.lat,gap.b.lng]]);map.fitBounds(bounds.pad(.25),{padding:[55,55],maxZoom:17,animate:false});}
+  if(gap)frameGpsReviewGap(points);
 }
 async function requestGpsProposal(){
   const state=gpsReviewState;if(!state||!state.gaps.length)return;
@@ -1555,7 +1574,7 @@ function advanceGpsGap(){
     $('gpsReject').disabled=true;
     $('gpsSkip').disabled=true;
     $('gpsFindRoute').disabled=true;
-    $('gpsRestore').disabled=true;$('gpsRestore').hidden=true;
+    $('gpsRestore').disabled=true;
     $('gpsProposalInfo').textContent='All flagged gaps reviewed. Approved corrections are applied. Select Done to return to the walk, or Previous to revisit a gap.';
   }
 }
@@ -1617,8 +1636,7 @@ function startGpsReview(index){
   if(heatLayer&&map.hasLayer(heatLayer))map.removeLayer(heatLayer);
   peeMarkersLayer.addTo(map);
   $('reviewSelectedWalk').disabled=true;
-  focusGpsGap();
-  requestAnimationFrame(()=>{map.invalidateSize();focusGpsGap();});
+  requestAnimationFrame(()=>focusGpsGap());
   window.scrollTo({top:0,behavior:'smooth'});
 }
 function finishGpsReview(){
