@@ -332,11 +332,11 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
       <p class="paw-step-note" id="pawStepNote">Estimated from walking distance, not measured by a sensor.</p>
       <h3>Most frequently marked areas</h3>
       <ol class="rank-list" id="favoriteList"><li>Not enough data yet</li></ol>
-      <p style="font-size:10px;color:#8994a8;line-height:1.4">Insights location groups use an approximate 10-metre radius; GPS accuracy varies. Pee density reflects recorded events, not time spent at a location.</p>
+      <p style="font-size:10px;color:#8994a8;line-height:1.4">Insights location groups use your selected proximity radius (Settings); GPS accuracy varies. Pee density reflects recorded events, not time spent at a location.</p>
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.4c</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.6</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -352,6 +352,11 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
       <p class="settings-help">Paw steps are an estimate based on distance and a Labrador gait reference, not a sensor reading. Shoulder height adjusts the estimate approximately. Weight and sex are saved for your dog's profile but don't alter the estimate.</p>
       <label class="settings-check"><input type="checkbox" id="offerGapReview"> Offer GPS gap review after walks (future feature)</label>
       <p class="settings-help">Preference saved for a future GPS repair feature; no GPS correction is performed in this version.</p>
+      <h3>📍 Pee location grouping</h3>
+      <label for="peeLocationRadius">Distinct location radius: <strong id="peeLocationRadiusValue">20 meters</strong></label>
+      <input id="peeLocationRadius" type="range" min="5" max="50" step="5" value="20" aria-describedby="peeLocationRadiusHelp">
+      <div style="display:flex;justify-content:space-between;color:#748096;font-size:11px"><span>5 m · precise</span><span>50 m · broad</span></div>
+      <p class="settings-help" id="peeLocationRadiusHelp">Nearby pee events within this radius count as one location in Insights. Adjusting this changes location statistics only; original events and map markers are never merged.</p>
       <h3>🗂️ Data &amp; Backup</h3>
       <p class="settings-help">Manage saved walks and pee events, or create and restore a backup.</p>
       <div class="utility-grid settings-utilities">
@@ -409,7 +414,7 @@ function loadData(){
 function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(data));}
 let data=loadData();
 const PREFS_KEY='peeTrackerPreferences';
-const DEFAULT_PREFS={name:'Stevie',breed:'Labrador Retriever',weight:75,height:null,sex:'female',showPawSteps:true,offerGapReview:false};
+const DEFAULT_PREFS={name:'Stevie',breed:'Labrador Retriever',weight:75,height:null,sex:'female',showPawSteps:true,offerGapReview:false,peeLocationRadius:20};
 function sanitizePrefs(raw){
   const p=raw&&typeof raw==='object'?raw:{};
   const num=(v,min,max)=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=min&&Number(v)<=max?Number(v):null;
@@ -418,7 +423,8 @@ function sanitizePrefs(raw){
     weight:num(p.weight,1,300),height:num(p.height,4,45),
     sex:['female','male','unknown'].includes(p.sex)?p.sex:DEFAULT_PREFS.sex,
     showPawSteps:typeof p.showPawSteps==='boolean'?p.showPawSteps:true,
-    offerGapReview:p.offerGapReview===true};
+    offerGapReview:p.offerGapReview===true,
+    peeLocationRadius:Number.isFinite(Number(p.peeLocationRadius))?Math.max(5,Math.min(50,Math.round(Number(p.peeLocationRadius)/5)*5)):20};
 }
 function loadPrefs(){try{return sanitizePrefs({...DEFAULT_PREFS,...JSON.parse(localStorage.getItem(PREFS_KEY)||'{}')});}catch(e){return {...DEFAULT_PREFS};}}
 let prefs=loadPrefs();
@@ -797,7 +803,7 @@ function updateInsights(){
   $('insightMostPees').textContent=walks.length?Math.max(0,...peeCounts.values()):'—';
   $('perMile').textContent=miles>0?(pees.length/miles).toFixed(1):'—';
   const valid=pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng));
-  const clusters=clusterPees(valid);
+  const clusters=clusterPees(valid,prefs.peeLocationRadius);
   const repeatEvents=clusters.filter(c=>c.events.length>1).reduce((n,c)=>n+c.events.length,0);
   $('uniqueLocations').textContent=clusters.length;
   $('repeatCount').textContent=repeatEvents;
@@ -1012,10 +1018,22 @@ function openSettings(){
   $('dogWeight').value=prefs.weight??'';$('dogHeight').value=prefs.height??'';
   $('dogSex').value=prefs.sex;$('showPawSteps').checked=prefs.showPawSteps;
   $('offerGapReview').checked=prefs.offerGapReview;
+  $('peeLocationRadius').value=prefs.peeLocationRadius;
+  $('peeLocationRadiusValue').textContent=prefs.peeLocationRadius+' meters';
   settingsOverlay.hidden=false;document.body.style.overflow='hidden';
 }
-function closeSettings(){settingsOverlay.hidden=true;document.body.style.overflow='';}
+function closeSettings(){
+  // Discard unsaved slider changes, like the other settings fields.
+  prefs=loadPrefs();updateInsights();
+  settingsOverlay.hidden=true;document.body.style.overflow='';
+}
 $('settingsBtn').addEventListener('click',openSettings);
+$('peeLocationRadius').addEventListener('input',e=>{
+  const radius=Number(e.target.value);
+  $('peeLocationRadiusValue').textContent=radius+' meters';
+  // Live preview in Insights without persisting until Save settings.
+  prefs.peeLocationRadius=radius;updateInsights();
+});
 $('closeSettings').addEventListener('click',closeSettings);
 $('cancelSettings').addEventListener('click',closeSettings);
 settingsOverlay.addEventListener('click',e=>{if(e.target===settingsOverlay)closeSettings();});
@@ -1024,7 +1042,8 @@ $('settingsForm').addEventListener('submit',e=>{
   e.preventDefault();
   prefs=sanitizePrefs({name:$('dogName').value,breed:$('dogBreed').value,
     weight:$('dogWeight').value,height:$('dogHeight').value,sex:$('dogSex').value,
-    showPawSteps:$('showPawSteps').checked,offerGapReview:$('offerGapReview').checked});
+    showPawSteps:$('showPawSteps').checked,offerGapReview:$('offerGapReview').checked,
+    peeLocationRadius:$('peeLocationRadius').value});
   localStorage.setItem(PREFS_KEY,JSON.stringify(prefs));
   updateInsights();closeSettings();toast('Settings saved');
 });
