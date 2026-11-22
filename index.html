@@ -38,6 +38,8 @@ header{background:linear-gradient(120deg,#102c19,#193d24);color:#fff9e9;border-r
 .map-count span{display:block;color:var(--muted);font-weight:500;font-size:11px;margin-top:2px}
 .map-actions{position:absolute;z-index:500;left:12px;top:12px;display:flex;flex-direction:column;gap:6px}
 .map-actions button{width:38px;height:38px;border:0;border-radius:11px;background:#fff;font-size:19px;box-shadow:0 2px 8px #17223524;padding:0}
+/* Center both SVG icons and emoji within the pee-display toggle. */
+#mapLayerBtn{display:flex;align-items:center;justify-content:center;line-height:1}
 .panel{background:var(--panel);border-radius:22px;padding:15px;box-shadow:0 4px 16px #17223512}
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
 .section-head h2{font-size:17px;margin:0;font-weight:800}
@@ -327,7 +329,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.3</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.4c</span></footer>
 </div>
 <div id="settingsOverlay" class="data-overlay" hidden>
   <section class="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
@@ -633,7 +635,7 @@ function syncPeeDisplay(){
   const labels={heatmap:['🔥','Heatmap','Clusters'],clusters:['pin','Clusters','Off'],off:['ban','Off','Heatmap']};
   const [symbol,label,next]=labels[peeMode];
   const iconSvg={
-    pin:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" fill="#E5B700" stroke="#8A6800" stroke-width="1.5"/><circle cx="12" cy="10" r="2.8" fill="#FFF7CE"/></svg>',
+    pin:'<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><g fill="#E5B700" stroke="#8A6800" stroke-width="1.1" stroke-linejoin="round"><path d="M10 6.2a3.5 3.5 0 0 0-7 0c0 2.5 3.5 6.1 3.5 6.1S10 8.7 10 6.2Z"/><path d="M21 6.2a3.5 3.5 0 0 0-7 0c0 2.5 3.5 6.1 3.5 6.1S21 8.7 21 6.2Z"/><path d="M15.5 13.4a4 4 0 0 0-8 0c0 2.9 4 7.1 4 7.1s4-4.2 4-7.1Z"/></g><g fill="#FFF7CE"><circle cx="6.5" cy="6.1" r="1.15"/><circle cx="17.5" cy="6.1" r="1.15"/><circle cx="11.5" cy="13.3" r="1.3"/></g></svg>',
     ban:'<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" style="display:block"><circle cx="12" cy="12" r="9" fill="none" stroke="#D64A44" stroke-width="3"/><path d="M5.7 5.7 18.3 18.3" stroke="#D64A44" stroke-width="3" stroke-linecap="round"/></svg>'
   };
   if(iconSvg[symbol])btn.innerHTML=iconSvg[symbol];else btn.textContent=symbol;
