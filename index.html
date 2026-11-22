@@ -101,6 +101,12 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 .cluster-icon{background:transparent;border:0}
 .cluster-bubble{display:flex;align-items:center;justify-content:center;border:3px solid white;border-radius:50%;background:#e9a51c;color:#172235;font-weight:850;font-size:14px;box-shadow:0 2px 9px #17223566;width:100%;height:100%}
 .cluster-bubble.many{background:#d96c23;color:white}
+.cluster-bubble.latest-only{background:#008C95;color:white}
+.cluster-bubble.mixed{background:linear-gradient(90deg,#E5B700 0 50%,#008C95 50% 100%);color:#172235;text-shadow:0 1px 1px #ffffffaa}
+.latest-pee-legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:7px;font-size:11px;color:#536175}
+.latest-pee-legend[hidden]{display:none!important}
+.latest-pee-legend .swatch{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px;border:1px solid #ffffffaa}
+.visit-latest{display:inline-block;color:#00777e;font-weight:750;font-size:10px;margin-left:5px}
 .visit-popup{min-width:220px;max-width:260px}
 .visit-popup h3{font-size:15px;margin:0 0 8px}
 .visit-meta{font-size:12px;line-height:1.5;color:#59667a;margin-bottom:8px}
@@ -275,6 +281,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     <div class="section-head"><h2>📍 Map history</h2>
     <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
     <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
+    <div id="latestPeeLegend" class="latest-pee-legend" hidden><span><i class="swatch" style="background:#008C95"></i>Latest walk</span><span><i class="swatch" style="background:#E5B700"></i>History</span></div>
     <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
     <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
     <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
@@ -521,6 +528,20 @@ function groupVisiblePees(){
   });
   return groups;
 }
+// Latest walk is identified by the same saved-walk ordering used by the route layer.
+function latestRecordedWalk(){
+  return data.walks.filter(w=>Array.isArray(w.path)&&w.path.length>1)
+    .reduce((best,w)=>!best||((walkStart(w)||0)>(walkStart(best)||0))?w:best,null);
+}
+function latestPeeContext(){
+  if(routeMode!=='latest'||peeMode!=='clusters'||selectedHistoryWalkIndex!==null||gpsReviewState)return null;
+  const walk=latestRecordedWalk();
+  if(!walk)return null;
+  return new Set(peesForWalk(walk).map(p=>p._index));
+}
+function updateLatestPeeLegend(){
+  $('latestPeeLegend').hidden=!latestPeeContext();
+}
 function popupForGroup(g){
   const events=g.events.slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   const dates=events.map(e=>new Date(e.timestamp).getTime()).filter(Number.isFinite);
@@ -537,22 +558,36 @@ function popupForGroup(g){
   const dateText=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
   const heading=events.length===1?'Pee location':`${events.length} pee events nearby`;
   const meta=`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walks: ${distinctWalks.size}<br>`:''}`;
-  const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
+  const latestIds=latestPeeContext();
+  const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${latestIds?.has(e._index)?'<span class="visit-latest">Latest walk</span>':''}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
   return `<div class="visit-popup"><h3>${heading}</h3><div class="visit-meta">${meta}</div><div class="visit-list">${rows}</div></div>`;
 }
 function renderPeeMarkers(){
   peeMarkersLayer.clearLayers();
+  const latestIds=latestPeeContext();
   groupVisiblePees().forEach(g=>{
     const count=g.events.length;
-    if(count===1){L.circleMarker([g.lat,g.lng],{radius:7,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.95}).bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false}).addTo(peeMarkersLayer);}
-    else{
+    const latestCount=latestIds?g.events.filter(e=>latestIds.has(e._index)).length:0;
+    const latestOnly=latestIds&&latestCount===count;
+    const mixed=latestIds&&latestCount>0&&latestCount<count;
+    if(count===1){
+      const latest=latestCount===1;
+      L.circleMarker([g.lat,g.lng],latest
+        ?{radius:7,color:'#00646B',weight:2,fillColor:'#008C95',fillOpacity:1}
+        :{radius:7,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.95})
+        .bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false}).addTo(peeMarkersLayer);
+      if(latest){
+        L.circleMarker([g.lat,g.lng],{radius:2.5,color:'#ffffff',weight:0,fillColor:'#ffffff',fillOpacity:1,interactive:false}).addTo(peeMarkersLayer);
+      }
+    }else{
       const diameter=count>=100?47:count>=10?42:36;
-      const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${count>=10?'many':''}">${count}</div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
+      const className=latestOnly?'latest-only':mixed?'mixed':count>=10?'many':'';
+      const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${className}">${count}</div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
       const marker=L.marker([g.lat,g.lng],{icon}).addTo(peeMarkersLayer);
       marker.bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false});
-      // The bound popup opens on tap; popupopen pans without changing zoom.
     }
   });
+  updateLatestPeeLegend();
 }
 function walkStart(w){
   const t=Number(w.startTime??w.id??w.path?.[0]?.timestamp);
@@ -627,6 +662,7 @@ function renderWalkRoutes(){
     });
   }
   updateRouteControls();
+  updateLatestPeeLegend();
   if(!map.hasLayer(walkPathsLayer))walkPathsLayer.addTo(map);
 }
 function syncPeeDisplay(){
@@ -642,6 +678,7 @@ function syncPeeDisplay(){
   btn.setAttribute('aria-label',`Pee display: ${label}. Tap for ${next}`);
   btn.title=`Pee display: ${label} · tap for ${next}`;
   btn.dataset.mode=peeMode;
+  updateLatestPeeLegend();
   $('peeDensityLegend').hidden=!heatVisible;
   if(heatLayer){if(heatVisible&&!gpsReviewState){if(!map.hasLayer(heatLayer))heatLayer.addTo(map);}else map.removeLayer(heatLayer);}
   // During GPS Review, keep the selected walk's markers as before.
@@ -654,6 +691,7 @@ function setPeeMode(mode,{persist=true}={}){
   if(persist)localStorage.setItem(PEE_MODE_KEY,mode);
   syncPeeDisplay();
   if(heatVisible)refreshHeatmap();
+  renderPeeMarkers();
   updateStats();
 }
 function syncPeeModeForRouteChange(){
@@ -941,7 +979,7 @@ $('routeModes').addEventListener('click',event=>{
   routeMode=button.dataset.route;
   syncPeeModeForRouteChange();
   $('routeModes').querySelectorAll('button').forEach(b=>{const active=b===button;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
-  renderWalkRoutes();
+  renderWalkRoutes();renderPeeMarkers();
   setStatus(routeMode==='off'?'Saved walk routes hidden.':routeMode==='latest'?'Showing most recent saved walk.':'Showing historical routes for the selected period.');
 });
 $('routeStyles').addEventListener('click',event=>{
