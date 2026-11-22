@@ -366,7 +366,7 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9a</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -389,8 +389,8 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
       <h3>⚙️ Tracking preferences</h3>
       <label class="settings-check"><input type="checkbox" id="showPawSteps"> Show estimated paw steps in Insights</label>
       <p class="settings-help">Paw steps are an estimate based on distance and a Labrador gait reference, not a sensor reading. Shoulder height adjusts the estimate approximately. Weight and sex are saved for your dog's profile but don't alter the estimate.</p>
-      <label class="settings-check"><input type="checkbox" id="offerGapReview"> Offer GPS gap review after walks (future feature)</label>
-      <p class="settings-help">Preference saved for a future GPS repair feature; no GPS correction is performed in this version.</p>
+      <label class="settings-check"><input type="checkbox" id="offerGapReview"> Offer GPS gap review after walks</label>
+      <p class="settings-help">When a completed walk contains suspicious GPS gaps, ask whether to review them. Corrections require your approval, and original GPS points are preserved. You can always open GPS Review from Walk History.</p>
       <h3>📍 Pee location grouping</h3>
       <label for="peeLocationRadius">Distinct location radius: <strong id="peeLocationRadiusValue">20 meters</strong></label>
       <input id="peeLocationRadius" type="range" min="5" max="50" step="5" value="20" aria-describedby="peeLocationRadiusHelp">
@@ -417,10 +417,17 @@ body.gps-review-active .gps-review-panel>p:last-child{font-size:10px;line-height
     <div class="data-sheet-foot"><span id="dataShowing"></span><button type="button" id="closeDataBottom">Done</button></div>
   </section>
 </div>
+<div id="postWalkReviewOverlay" class="data-overlay" hidden>
+  <section class="data-sheet walk-delete-sheet" role="dialog" aria-modal="true" aria-labelledby="postWalkReviewTitle">
+    <div class="data-sheet-head"><div><h2 id="postWalkReviewTitle">🧭 Review GPS gaps?</h2><small id="postWalkReviewCount"></small></div><button type="button" id="postWalkReviewClose" aria-label="Not now">✕</button></div>
+    <div class="walk-delete-body"><p>The walk was saved. Some GPS segments may be missing or inaccurate. Would you like to review them now?</p><p class="settings-help">Review is optional. No corrections are applied without your approval. You can review this walk later in Walk History.</p></div>
+    <div class="data-sheet-foot"><button type="button" id="postWalkReviewLater">Not now</button><button type="button" id="postWalkReviewStart">Review gaps</button></div>
+  </section>
+</div>
 <div id="walkHistoryOverlay" class="data-overlay" hidden>
   <section class="data-sheet walk-history-sheet" role="dialog" aria-modal="true" aria-labelledby="walkHistoryTitle">
     <div class="data-sheet-head"><div><h2 id="walkHistoryTitle">🐾 Walk History</h2><small id="walkHistoryCount">Completed walks</small></div><button type="button" id="closeWalkHistory" aria-label="Close walk history">✕</button></div>
-    <p class="walk-history-help">Select a walk to view its route, or delete a walk and optionally its associated pee events. GPS Review highlights possible tracking gaps without changing your saved route.</p>
+    <p class="walk-history-help">Select a walk to view its route, or delete a walk and optionally its associated pee events. GPS Review flags possible tracking gaps. You can approve a suggested walking route or restore original segments; original GPS points are preserved.</p>
     <div id="walkHistoryList" class="data-list walk-history-list"></div>
     <div class="data-sheet-foot"><span>Export a backup before deleting important records</span><button type="button" id="closeWalkHistoryBottom">Done</button></div>
   </section>
@@ -1017,8 +1024,13 @@ function endWalk(){
   isWalking=false;if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
   if(currentWalkCoords.length){
     const startTime=currentWalkCoords[0].timestamp,endTime=currentWalkCoords[currentWalkCoords.length-1].timestamp;
-    data.walks.push({id:currentWalkId,startTime,endTime,path:currentWalkCoords});
+    const savedWalk={id:currentWalkId,startTime,endTime,path:currentWalkCoords};
+    data.walks.push(savedWalk);
     saveData();renderExistingData();toast(`Walk saved · ${fmtDistance(pathDistance(currentWalkCoords))}`);
+    if(prefs.offerGapReview){
+      const gaps=findGpsGaps(savedWalk);
+      if(gaps.length)requestPostWalkGpsReview(data.walks.length-1,gaps.length);
+    }
   }else setStatus('Walk ended; no GPS points were recorded.');
   if(walkPolyline){map.removeLayer(walkPolyline);walkPolyline=null;}
   currentWalkCoords=[];currentWalkId=null;
@@ -1297,7 +1309,7 @@ $('dataPeriod').addEventListener('change',renderDataList);
 dataOverlay.addEventListener('click',e=>{if(e.target===dataOverlay)closeDataList();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!dataOverlay.hidden)closeDataList();});
 
-// Walk History supports explicit, confirmed deletion. GPS repair remains a future feature.
+// Walk History supports deletion and optional GPS route corrections.
 const walkHistoryOverlay=document.getElementById('walkHistoryOverlay');
 function associatedPeeIndices(w){
   // Keep the same ID-first and timestamp-fallback matching used in Individual Walk View.
@@ -1571,6 +1583,30 @@ $('gpsRestore').addEventListener('click',()=>{
 });
 $('gpsReject').addEventListener('click',()=>{if(!gpsReviewState?.proposal)return;toast('Proposal rejected');advanceGpsGap();});
 $('gpsSkip').addEventListener('click',advanceGpsGap);
+let pendingPostWalkReviewIndex=null;
+function closePostWalkGpsReview(){
+  $('postWalkReviewOverlay').hidden=true;
+  pendingPostWalkReviewIndex=null;
+  document.body.style.overflow='';
+}
+function requestPostWalkGpsReview(index,count){
+  pendingPostWalkReviewIndex=index;
+  $('postWalkReviewCount').textContent=`${count} possible GPS ${count===1?'gap':'gaps'} found`;
+  $('postWalkReviewOverlay').hidden=false;
+  document.body.style.overflow='hidden';
+}
+$('postWalkReviewClose').addEventListener('click',closePostWalkGpsReview);
+$('postWalkReviewLater').addEventListener('click',closePostWalkGpsReview);
+$('postWalkReviewOverlay').addEventListener('click',e=>{if(e.target===$('postWalkReviewOverlay'))closePostWalkGpsReview();});
+$('postWalkReviewStart').addEventListener('click',()=>{
+  const index=pendingPostWalkReviewIndex;
+  closePostWalkGpsReview();
+  if(index===null||!data.walks[index])return;
+  returnToInsightsAfterWalk=false;
+  $('exitWalkView').textContent='Exit walk view ✕';
+  showHistoryWalk(index);
+  if(selectedHistoryWalkIndex===index)startGpsReview(index);
+});
 function startGpsReview(index){
   const walk=data.walks[index];
   if(!walk||selectedHistoryWalkIndex!==index)return;
