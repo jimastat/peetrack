@@ -335,14 +335,14 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
 .walk-operations .walk-history-link span{font-size:20px;line-height:1}
 body.walk-active .walk-operations .walk-history-link{display:none}
 
-/* v1.5.7: single pee markers sit above route overlays, like numbered clusters. */
+/* v1.5.8: single pee markers sit above route overlays, like numbered clusters. */
 .pee-single-icon{background:transparent;border:0}
 .pee-single-icon .pee-single-dot{position:absolute;left:11px;top:11px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .pee-single-icon .pee-single-dot.historical{background:#f4b52c;border:2px solid #a65e00}
 .pee-single-icon .pee-single-dot.latest{background:#008c95;border:2px solid #00646b}
 .pee-single-icon .pee-single-dot i{width:5px;height:5px;background:#fff;border-radius:50%}
 
-/* v1.5.7: repurpose the history row for compact live walk stats. */
+/* v1.5.8: repurpose the history row for compact live walk stats. */
 .live-walk-dashboard{margin-top:6px;padding:8px 10px 9px;border:1px solid #dbe4ed;border-radius:10px;background:#f1f5f8;color:#264456}
 .live-walk-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;font-weight:750;letter-spacing:.07em;color:#5c7180}
 .live-walk-heading #liveGpsStatus{font-size:10px;font-weight:550;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -355,7 +355,7 @@ body.walk-active .walk-operations .walk-history-link{display:none}
 body.walk-active .live-walk-dashboard{display:block}
 body:not(.walk-active) .live-walk-dashboard{display:none}
 
-/* v1.5.7: compact live statistics replace the map's lower-left count overlay while walking. */
+/* v1.5.8: compact live statistics replace the map's lower-left count overlay while walking. */
 .map-card .live-walk-dashboard{position:absolute;z-index:501;left:12px;bottom:12px;width:min(285px,calc(100% - 24px));margin:0;padding:9px 11px;border:0;border-radius:13px;background:#fffffff0;box-shadow:0 2px 10px #17223520;color:#1c3043;pointer-events:none}
 .map-card .live-walk-dashboard[hidden]{display:none!important}
 .map-card .live-walk-heading{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px;font-size:10px;font-weight:750;letter-spacing:.04em}
@@ -366,6 +366,13 @@ body:not(.walk-active) .live-walk-dashboard{display:none}
 .map-card .live-walk-stats em{font-size:10px;font-style:normal;font-weight:550}
 body.walk-active .map-count{display:none!important}
 body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
+
+/* v1.5.8: compact two-line live status, matching the idle map-count overlay. */
+.map-card .live-walk-dashboard{width:max-content;max-width:calc(100% - 24px);padding:9px 12px 8px;border-radius:12px;line-height:1.35}
+.map-card .live-compact-primary{font-size:16px;font-weight:750;color:#1c3043;white-space:nowrap;font-variant-numeric:tabular-nums}
+.map-card .live-compact-primary strong{font-weight:750}
+.map-card .live-compact-secondary{margin-top:3px;font-size:12px;color:#627386;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.map-card .live-sep{margin:0 5px;color:#8292a0}
 </style>
 </head>
   
@@ -386,12 +393,9 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     <div class="map-legend" id="peeDensityLegend"><div>Pee density</div><div class="gradient"></div><div style="display:flex;justify-content:space-between;color:#748096;font-size:10px;font-weight:500;margin-top:3px"><span>Less frequent</span><span>More frequent</span></div></div>
     <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
     <div id="liveWalkDashboard" class="live-walk-dashboard" hidden aria-label="Current walk statistics">
-      <div class="live-walk-heading"><span><span class="live-walk-dot"></span> CURRENT WALK</span><span id="liveGpsStatus">GPS starting…</span></div>
-      <div class="live-walk-stats">
-        <div><small>DISTANCE</small><strong id="liveWalkDistance">0.00 <em>mi</em></strong></div>
-        <div><small>ELAPSED</small><strong id="liveWalkElapsed">00:00</strong></div>
-        <div><small>PEES</small><strong id="liveWalkPees">0</strong></div>
-      </div>
+      <div class="live-compact-primary"><strong id="liveWalkDistance">0.00 mi</strong><span class="live-sep">·</span><strong id="liveWalkElapsed">00:00</strong></div>
+      <div class="live-compact-secondary"><span id="liveWalkPees">0</span> pees <span class="live-sep">·</span> <span id="liveGpsStatus">GPS starting…</span></div>
+    </div>
   </section>
 
   <section class="panel walk-operations" id="walkOperations" aria-label="Walk controls">
@@ -469,7 +473,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.7</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.8</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1121,7 +1125,7 @@ let walkDashboardStartedAt=0;
 let walkDashboardTimer=null;
 function updateLiveWalkDashboard(){
   if(!isWalking)return;
-  $('liveWalkDistance').innerHTML=(pathDistance(currentWalkCoords)/1609.344).toFixed(2)+' <em>mi</em>';
+  $('liveWalkDistance').textContent=(pathDistance(currentWalkCoords)/1609.344).toFixed(2)+' mi';
   const elapsed=Math.max(0,Math.floor((Date.now()-walkDashboardStartedAt)/1000));
   const hours=Math.floor(elapsed/3600),minutes=Math.floor((elapsed%3600)/60),seconds=elapsed%60;
   $('liveWalkElapsed').textContent=(hours?hours+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
