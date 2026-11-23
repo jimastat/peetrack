@@ -334,6 +334,13 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
 .walk-operations .walk-history-link{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:42px;margin-top:5px;padding:7px 12px;background:#f5f7fb;border:1px solid #d7e0eb;border-radius:10px;color:#28517a;font-size:13px;font-weight:750;text-align:left;box-shadow:none}
 .walk-operations .walk-history-link span{font-size:20px;line-height:1}
 body.walk-active .walk-operations .walk-history-link{display:none}
+
+/* v1.5.5: single pee markers sit above route overlays, like numbered clusters. */
+.pee-single-icon{background:transparent;border:0}
+.pee-single-icon .pee-single-dot{position:absolute;left:11px;top:11px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.pee-single-icon .pee-single-dot.historical{background:#f4b52c;border:2px solid #a65e00}
+.pee-single-icon .pee-single-dot.latest{background:#008c95;border:2px solid #00646b}
+.pee-single-icon .pee-single-dot i{width:5px;height:5px;background:#fff;border-radius:50%}
 </style>
 </head>
   
@@ -428,7 +435,7 @@ body.walk-active .walk-operations .walk-history-link{display:none}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.3</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.5</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -686,13 +693,18 @@ function renderPeeMarkers(){
     const mixed=latestIds&&latestCount>0&&latestCount<count;
     if(count===1){
       const latest=latestCount===1;
-      L.circleMarker([g.lat,g.lng],latest
-        ?{radius:7,color:'#00646B',weight:2,fillColor:'#008C95',fillOpacity:1}
-        :{radius:7,color:'#a65e00',weight:2,fillColor:'#f4b52c',fillOpacity:.95})
-        .bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false}).addTo(peeMarkersLayer);
-      if(latest){
-        L.circleMarker([g.lat,g.lng],{radius:2.5,color:'#ffffff',weight:0,fillColor:'#ffffff',fillOpacity:1,interactive:false}).addTo(peeMarkersLayer);
-      }
+      // Use an HTML marker in Leaflet's marker pane, above interactive route
+      // polylines in the overlay pane. SVG circle markers could be covered by
+      // route layers even with an enlarged hit target.
+      const dotClass=latest?'latest':'historical';
+      const icon=L.divIcon({
+        className:'pee-single-icon',
+        html:`<span class="pee-single-dot ${dotClass}">${latest?'<i></i>':''}</span>`,
+        iconSize:[36,36],iconAnchor:[18,18],popupAnchor:[0,-10]
+      });
+      L.marker([g.lat,g.lng],{icon,keyboard:true})
+        .bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false})
+        .addTo(peeMarkersLayer);
     }else{
       const diameter=count>=100?47:count>=10?42:36;
       const className=latestOnly?'latest-only':mixed?'mixed':count>=10?'many':'';
