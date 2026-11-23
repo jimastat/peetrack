@@ -490,7 +490,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.13</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.14</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -625,33 +625,8 @@ const $=id=>document.getElementById(id);
 function setStatus(msg){$('status').textContent=msg;}
 function toast(msg){$('toast').textContent=msg;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),1900);}
 function placeCurrentMarker(lat,lng){if(currentPosMarker)currentPosMarker.setLatLng([lat,lng]);else currentPosMarker=L.circleMarker([lat,lng],{radius:8,color:'#fff',weight:3,fillColor:'#1769e8',fillOpacity:1}).addTo(map);}
-// Follow-location pauses for 15 seconds after a user map gesture.
-// Programmatic pan/fitBounds do not count as user gestures.
-const WALK_FOLLOW_DELAY=15000;
-let walkFollowPausedUntil=0,walkFollowTimer=null;
-function latestWalkLocation(){
-  const p=currentWalkCoords[currentWalkCoords.length-1];
-  return p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng)?[p.lat,p.lng]:null;
-}
-function resumeWalkFollow(){
-  walkFollowPausedUntil=0;
-  if(walkFollowTimer!==null){clearTimeout(walkFollowTimer);walkFollowTimer=null;}
-  if(isWalking){const coords=latestWalkLocation();if(coords)map.panTo(coords,{animate:true,duration:.35});}
-}
-function pauseWalkFollow(){
-  if(!isWalking)return;
-  walkFollowPausedUntil=Date.now()+WALK_FOLLOW_DELAY;
-  if(walkFollowTimer!==null)clearTimeout(walkFollowTimer);
-  walkFollowTimer=setTimeout(resumeWalkFollow,WALK_FOLLOW_DELAY);
-}
-// Leaflet's dragstart represents actual map dragging, not map.panTo().
-map.on('dragstart',pauseWalkFollow);
-// A wheel or touch zoom also counts as exploration; zoomend itself can be programmatic.
-map.getContainer().addEventListener('wheel',pauseWalkFollow,{passive:true});
-map.getContainer().addEventListener('touchstart',event=>{if(event.touches.length>1)pauseWalkFollow();},{passive:true});
-map.on('zoomstart',()=>{if(isWalking&&map._zoomAnimated&&map._animatingZoom)pauseWalkFollow();});
-function centerOnMe(){   if(isWalking){resumeWalkFollow();setStatus('Following your location.');return;}
-   if(!navigator.geolocation){setStatus('Location is not supported by this browser.');return;}
+function centerOnMe(){
+  if(!navigator.geolocation){setStatus('Location is not supported by this browser.');return;}
   setStatus('Finding your location…');
   navigator.geolocation.getCurrentPosition(pos=>{const{latitude,longitude}=pos.coords;map.setView([latitude,longitude],17);placeCurrentMarker(latitude,longitude);setStatus('Map centered on your location.');},err=>setStatus('Location unavailable: '+err.message),{enableHighAccuracy:true,timeout:15000});
 }
@@ -1189,8 +1164,7 @@ function startWalk(){
   if(isWalking){setStatus('A walk is already in progress.');return;}
   if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
   setMapOptionsExpanded(false);
-   resumeWalkFollow();
-   isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
+  isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
   walkDashboardStartedAt=Date.now();
   if(walkDashboardTimer!==null)clearInterval(walkDashboardTimer);
   walkDashboardTimer=setInterval(updateLiveWalkDashboard,1000);
@@ -1204,7 +1178,7 @@ function startWalk(){
     const{latitude,longitude,accuracy}=pos.coords;
     const point={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy};
     currentWalkCoords.push(point);walkPolyline.addLatLng([latitude,longitude]);placeCurrentMarker(latitude,longitude);
-    if(Date.now()>=walkFollowPausedUntil)map.panTo([latitude,longitude],{animate:false});
+    map.panTo([latitude,longitude],{animate:false});
 
     updateLiveWalkDashboard();
     const distance=pathDistance(currentWalkCoords);
@@ -1215,8 +1189,7 @@ function startWalk(){
 function endWalk(){
   if(!isWalking){setStatus('No walk is currently in progress.');return;}
   isWalking=false;
-   resumeWalkFollow();
-   if(walkDashboardTimer!==null){clearInterval(walkDashboardTimer);walkDashboardTimer=null;}
+  if(walkDashboardTimer!==null){clearInterval(walkDashboardTimer);walkDashboardTimer=null;}
   if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
   if(currentWalkCoords.length){
     const startTime=currentWalkCoords[0].timestamp,endTime=currentWalkCoords[currentWalkCoords.length-1].timestamp;
