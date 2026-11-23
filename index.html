@@ -490,7 +490,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.11</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.13</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -933,7 +933,7 @@ function updateStats(){
 
   $('undoPeeBtn').disabled=data.pees.length===0;
   if(selectedHistoryWalkIndex!==null){
-    $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${peeMode==='heatmap'?(selectedPeriod==='all'?'all-time':'filtered')+' heatmap + walk markers':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
+    $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${peeMode==='heatmap'?(selectedPeriod==='all'?'all-time':'filtered')+' heatmap + walk markers':peeMode==='clusters'?'selected-walk pee markers':'route only · pee markers off'}</span>`;
   }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${peeMode==='heatmap'?'heatmap':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
@@ -1397,7 +1397,7 @@ function toggleHeatmap(){
   if(next==='heatmap'&&selectedHistoryWalkIndex===null&&routeMode==='filtered'&&routeStyle==='heatmap'){
     routeStyle='lines';localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);renderWalkRoutes();
   }
-  setPeeMode(next,{persist:peeModeBeforeFiltered===null});
+  setPeeMode(next,{persist:selectedHistoryWalkIndex===null&&peeModeBeforeFiltered===null});
   setStatus(`Pee display: ${next==='heatmap'?'Heatmap':next==='clusters'?'Clusters':'Off'}`);
 }
 $('mapLayerBtn').addEventListener('click',toggleHeatmap);
@@ -1888,6 +1888,9 @@ function showHistoryWalk(index){
     preWalkViewMapState={routeMode,routeStyle,heatVisible,peeMode,selectedPeriod};
   }
   selectedHistoryWalkIndex=index;
+  // Inspecting a walk is temporary: if the normal pee layer was Off, begin
+  // with this walk's markers visible. Never overwrite the saved map preference.
+  if(peeMode==='off')peeMode='clusters';
   selectedWalkLayer.clearLayers();
   const points=path.map(p=>[p.lat,p.lng]);
   // White casing keeps deep teal legible over streets and satellite-like map detail.
