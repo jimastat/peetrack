@@ -306,6 +306,29 @@ body.walk-active #stopBtn{grid-column:2;grid-row:2;min-height:44px;font-size:13p
 body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
 .walk-operations[hidden]{display:none!important}
 @media(max-width:360px){body.walk-active #peeBtn{font-size:16px}body.walk-active #undoPeeBtn{font-size:11px}}
+
+/* v1.5.1: one contextual map toolbar, expandable map options. */
+.walk-operations{position:relative;padding:9px 11px 10px}
+.walk-operations-head{display:none!important}
+.walk-operations .action-grid{margin:0}
+body:not(.walk-active) .walk-operations .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+body:not(.walk-active) #startBtn{width:100%;min-height:46px}
+#mapOptionsToggle{display:flex;align-items:center;justify-content:center;gap:7px;min-height:46px;padding:8px 10px;border:1px solid #d4dfeb;background:#edf1f7;color:#213b5c;font-size:13px;font-weight:750;border-radius:12px}
+#mapOptionsToggle span:first-child{font-size:20px;line-height:1;color:#176f83}
+#mapOptionsChevron{font-size:18px;line-height:1}
+body:not(.walk-active) #mapOptionsToggle{position:absolute;top:9px;right:11px;width:calc((100% - 30px)/2)}
+body:not(.walk-active) .walk-operations .action-grid{padding-right:calc(50% + 4px)}
+body:not(.walk-active) .walk-operations .action-grid{grid-template-columns:minmax(0,1fr)}
+body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;padding:5px 9px;font-size:12px}
+.walk-operations #status{display:none}
+.walk-operations .history-panel{margin:9px 0 0;padding:10px 8px 6px;background:#f7f9fc;border:1px solid #dbe4ed;border-radius:12px;box-shadow:none}
+.walk-operations .history-panel[hidden]{display:none!important}
+.walk-operations .history-panel .section-head{display:flex!important;flex-wrap:wrap;gap:7px}
+.walk-operations .history-panel .section-head h2{font-size:12px}
+.walk-operations .history-panel #mapFilters{flex-wrap:wrap;justify-content:flex-end}
+.walk-operations .history-panel #routeSelector{flex-wrap:wrap;gap:7px}
+.walk-operations .history-panel #walkHistoryBtn{margin-top:9px}
+@media(max-width:360px){#mapOptionsToggle{font-size:11px;gap:4px}body:not(.walk-active) #startBtn{font-size:12px;padding:7px}}
 </style>
 </head>
   
@@ -328,14 +351,25 @@ body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
   </section>
 
   <section class="panel walk-operations" id="walkOperations" aria-label="Walk controls">
-    <div class="section-head"><h2>🐾 Field Operations</h2><small id="walkStatus">Not walking</small></div>
+    <div class="section-head walk-operations-head"><h2>🐾 <span id="walkOperationsTitle">Field Operations</span></h2><small id="walkStatus">Not walking</small></div>
     <div class="action-grid">
       <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
       <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
       <button class="action" id="peeBtn">📍 &nbsp;Pee Here!</button>
       <button class="action" id="undoPeeBtn" disabled>↶ &nbsp;Undo last pee</button>
     </div>
+    <button type="button" id="mapOptionsToggle" aria-expanded="false" aria-controls="mapOptionsPanel"><span aria-hidden="true">☷</span> Map Options <span id="mapOptionsChevron" aria-hidden="true">⌄</span></button>
     <div class="status-line" id="status" aria-live="polite">Ready when you are</div>
+  <section class="history-panel" id="mapOptionsPanel" aria-label="Map options" hidden>
+    <div class="section-head"><h2>📍 Time range</h2>
+    <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
+    <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
+    <div id="latestPeeLegend" class="latest-pee-legend" hidden><span><i class="swatch" style="background:#008C95"></i>Latest walk</span><span><i class="swatch" style="background:#E5B700"></i>History</span></div>
+    <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
+    <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
+    <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
+    <button type="button" id="walkHistoryBtn" class="walk-history-open">📅 View Walk History <span>›</span></button>
+  </section>
   </section>
 
   <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><div class="selected-walk-actions"><button type="button" id="reviewSelectedWalk">GPS Review</button><button type="button" id="exitWalkView">Exit walk view ✕</button></div></div>
@@ -348,16 +382,7 @@ body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
     <div class="gps-review-actions"><button type="button" id="gpsReviewPrev">← Previous</button><button type="button" id="gpsReviewNext">Next →</button><button type="button" class="gps-review-done" id="gpsReviewDone">Done</button></div>
     <p style="margin-bottom:0;color:#65788a;font-size:11px">Approved corrections update displayed routes and distance statistics. Original GPS points are preserved; use Restore original to reverse a correction. Routing uses an online pedestrian service.</p>
   </div>
-  <section class="panel history-panel" aria-label="Map time filters">
-    <div class="section-head"><h2>📍 Map history</h2>
-    <div id="mapFilters"><button data-period="today">Today</button><button data-period="week">7 days</button><button data-period="month">30 days</button><button data-period="all" class="active">All time</button></div></div>
-    <div id="routeSelector"><span class="route-label">Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off">Off</button><button type="button" data-route="latest" class="active" aria-pressed="true">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
-    <div id="latestPeeLegend" class="latest-pee-legend" hidden><span><i class="swatch" style="background:#008C95"></i>Latest walk</span><span><i class="swatch" style="background:#E5B700"></i>History</span></div>
-    <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
-    <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
-    <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
-    <button type="button" id="walkHistoryBtn" class="walk-history-open">📅 View Walk History <span>›</span></button>
-  </section>
+
 
   <section class="panel">
     <div class="section-head"><h2>📊 Insights</h2><button id="detailsBtn" style="border:0;background:none;color:#1769e8;font-weight:750;font-size:12px;padding:5px">View details&nbsp;›</button></div>
@@ -397,7 +422,7 @@ body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.0</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.1</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1032,10 +1057,19 @@ centerOnMe();
 if(data.pees.length){const bounds=L.latLngBounds(data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>[p.lat,p.lng]));if(bounds.isValid())map.fitBounds(bounds.pad(.25),{maxZoom:16});}
 setTimeout(()=>map.invalidateSize(),250);
 
+let mapOptionsExpanded=false;
+function setMapOptionsExpanded(expanded){
+  mapOptionsExpanded=!!expanded;
+  $('mapOptionsPanel').hidden=!mapOptionsExpanded;
+  $('mapOptionsToggle').setAttribute('aria-expanded',String(mapOptionsExpanded));
+  $('mapOptionsChevron').textContent=mapOptionsExpanded?'⌃':'⌄';
+}
+$('mapOptionsToggle').addEventListener('click',()=>setMapOptionsExpanded(!mapOptionsExpanded));
 function syncWalkControls(){
   document.body.classList.toggle('walk-active',isWalking);
   const hiddenForHistory=!isWalking&&(selectedHistoryWalkIndex!==null||!!gpsReviewState);
   $('walkOperations').hidden=hiddenForHistory;
+  $('mapOptionsToggle').hidden=hiddenForHistory;
   $('startBtn').disabled=isWalking;
   $('stopBtn').disabled=!isWalking;
   if(!isWalking)$('walkStatus').textContent='Not walking';
@@ -1044,6 +1078,7 @@ function syncWalkControls(){
 function startWalk(){
   if(isWalking){setStatus('A walk is already in progress.');return;}
   if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
+  setMapOptionsExpanded(false);
   isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
   if(walkPolyline)map.removeLayer(walkPolyline);
   walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
