@@ -286,6 +286,26 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
 .pee-location-bubble{display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px;border:2px solid #956e00;background:#f4c54a;color:#302400;font-weight:800;box-shadow:0 1px 5px #0004}
 .pee-location-bubble.favorite{background:#008c95;color:white;border-color:#006970}
 @media(max-width:420px){.pee-locations-sheet{height:94dvh}.pee-locations-toolbar{padding:8px 10px}#peeLocationsMap{height:43%}}
+
+/* v1.5.0: map-adjacent, state-aware walk controls. */
+.walk-operations{padding:9px 12px 10px;border-radius:16px}
+.walk-operations .section-head{margin-bottom:5px}
+.walk-operations .section-head h2{font-size:13px}
+.walk-operations .section-head small{font-variant-numeric:tabular-nums}
+.walk-operations .status-line{margin-top:5px;font-size:11px;min-height:0}
+.walk-operations .action-grid{display:grid;gap:8px}
+.walk-operations .action{border-radius:12px;min-height:44px;padding:8px 10px}
+body:not(.walk-active) .walk-operations .action-grid{display:flex;justify-content:flex-end}
+body:not(.walk-active) #startBtn{min-height:44px;padding:8px 18px;font-size:14px}
+body:not(.walk-active) #stopBtn,body:not(.walk-active) #peeBtn,body:not(.walk-active) #undoPeeBtn{display:none}
+body.walk-active #startBtn{display:none}
+body.walk-active .walk-operations .action-grid{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:44px 44px;gap:7px}
+body.walk-active #peeBtn{grid-column:1;grid-row:1/3;min-height:95px;font-size:18px}
+body.walk-active #undoPeeBtn{grid-column:2;grid-row:1;min-height:44px;font-size:12px}
+body.walk-active #stopBtn{grid-column:2;grid-row:2;min-height:44px;font-size:13px}
+body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
+.walk-operations[hidden]{display:none!important}
+@media(max-width:360px){body.walk-active #peeBtn{font-size:16px}body.walk-active #undoPeeBtn{font-size:11px}}
 </style>
 </head>
   
@@ -307,6 +327,17 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
     <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
   </section>
 
+  <section class="panel walk-operations" id="walkOperations" aria-label="Walk controls">
+    <div class="section-head"><h2>🐾 Field Operations</h2><small id="walkStatus">Not walking</small></div>
+    <div class="action-grid">
+      <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
+      <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
+      <button class="action" id="peeBtn">📍 &nbsp;Pee Here!</button>
+      <button class="action" id="undoPeeBtn" disabled>↶ &nbsp;Undo last pee</button>
+    </div>
+    <div class="status-line" id="status" aria-live="polite">Ready when you are</div>
+  </section>
+
   <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><div class="selected-walk-actions"><button type="button" id="reviewSelectedWalk">GPS Review</button><button type="button" id="exitWalkView">Exit walk view ✕</button></div></div>
   <div id="gpsReviewPanel" class="gps-review-panel" hidden>
     <div class="gps-review-heading"><span>🧭 GPS Review</span><span id="gpsReviewProgress">0 gaps</span></div>
@@ -326,17 +357,6 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
     <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
     <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
     <button type="button" id="walkHistoryBtn" class="walk-history-open">📅 View Walk History <span>›</span></button>
-  </section>
-
-  <section class="panel">
-    <div class="section-head"><h2>🐾 Field Operations</h2><small id="walkStatus">Not walking</small></div>
-    <div class="action-grid">
-      <button class="action" id="startBtn">▶ &nbsp;Start walk</button>
-      <button class="action" id="stopBtn" disabled>■ &nbsp;Stop walk</button>
-      <button class="action" id="peeBtn">📍 &nbsp;Pee Here!</button>
-      <button class="action" id="undoPeeBtn" disabled>↶ &nbsp;Undo last pee</button>
-    </div>
-    <div class="status-line" id="status">Ready when you are</div>
   </section>
 
   <section class="panel">
@@ -377,7 +397,7 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.4.9d</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.0</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -560,7 +580,7 @@ function refreshSelectedWalkRoute(){
   const date=walkStart(walk),count=peesForWalk(walk).length;
   $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+count+' pee '+(count===1?'event':'events')+' · '+fmtDistance(walkDistance(walk));
 }
-function fmtDistance(m){const mi=m/1609.344;return mi<.1?`${Math.round(m)} m`:`${mi.toFixed(1)} mi`;}
+function fmtDistance(m){const mi=m/1609.344;return `${mi.toFixed(2)} mi`;}
 function fmtDuration(ms){const mins=Math.max(0,Math.round(ms/60000));return mins<60?`${mins} min`:`${Math.floor(mins/60)}h ${mins%60}m`;}
 
 function peesForWalk(w){
@@ -868,13 +888,13 @@ function updateInsights(){
   const totalMs=durations.reduce((a,b)=>a+b,0);
   $('insightPees').textContent=pees.length;
   $('insightWalks').textContent=walks.length;
-  $('insightDistance').textContent=miles.toFixed(1)+' mi';
+  $('insightDistance').textContent=miles.toFixed(2)+' mi';
   $('pawStepsCard').hidden=!prefs.showPawSteps;
   $('pawStepsPerWalkCard').hidden=!prefs.showPawSteps;
   $('pawStepNote').hidden=!prefs.showPawSteps;
   $('pawSteps').textContent=walks.length?estimatePawSteps(totalMeters).toLocaleString():'—';
   $('pawStepsPerWalk').textContent=walks.length?Math.round(estimatePawSteps(totalMeters)/walks.length).toLocaleString():'—';
-  $('insightAvgDistance').textContent=walks.length?(miles/walks.length).toFixed(1)+' mi':'—';
+  $('insightAvgDistance').textContent=walks.length?(miles/walks.length).toFixed(2)+' mi':'—';
   $('insightAvgDuration').textContent=walks.length?fmtDuration(totalMs/walks.length):'—';
   // Match by walk ID when possible; fall back to the recorded walk time window
   // for older/unlinked events. Each pee is counted at most once.
@@ -1007,10 +1027,20 @@ $('closePeeLocations').addEventListener('click',closePeeLocations);
 $('donePeeLocations').addEventListener('click',closePeeLocations);
 
 renderExistingData();
+syncWalkControls();
 centerOnMe();
 if(data.pees.length){const bounds=L.latLngBounds(data.pees.filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lng)).map(p=>[p.lat,p.lng]));if(bounds.isValid())map.fitBounds(bounds.pad(.25),{maxZoom:16});}
 setTimeout(()=>map.invalidateSize(),250);
 
+function syncWalkControls(){
+  document.body.classList.toggle('walk-active',isWalking);
+  const hiddenForHistory=!isWalking&&(selectedHistoryWalkIndex!==null||!!gpsReviewState);
+  $('walkOperations').hidden=hiddenForHistory;
+  $('startBtn').disabled=isWalking;
+  $('stopBtn').disabled=!isWalking;
+  if(!isWalking)$('walkStatus').textContent='Not walking';
+  requestAnimationFrame(()=>map.invalidateSize());
+}
 function startWalk(){
   if(isWalking){setStatus('A walk is already in progress.');return;}
   if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
@@ -1018,7 +1048,7 @@ function startWalk(){
   if(walkPolyline)map.removeLayer(walkPolyline);
   walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
   $('walkBadge').textContent='WALK IN PROGRESS';$('walkBadge').classList.add('live');
-  $('walkStatus').textContent='Tracking';$('startBtn').disabled=true;$('stopBtn').disabled=false;
+  $('walkStatus').textContent='0.00 mi';syncWalkControls();
   setStatus('Starting GPS tracking…');
   watchId=navigator.geolocation.watchPosition(pos=>{
     const{latitude,longitude,accuracy}=pos.coords;
@@ -1046,7 +1076,7 @@ function endWalk(){
   if(walkPolyline){map.removeLayer(walkPolyline);walkPolyline=null;}
   currentWalkCoords=[];currentWalkId=null;
   $('walkBadge').textContent='READY';$('walkBadge').classList.remove('live');
-  $('walkStatus').textContent='Not walking';$('startBtn').disabled=false;$('stopBtn').disabled=true;
+  syncWalkControls();
   if(data.walks.length)setStatus('Walk stopped and saved.');
 }
 function logPeeEvent(){
@@ -1689,13 +1719,13 @@ function showHistoryWalk(index){
   const date=walkStart(walk),peeCount=peesForWalk(walk).length;
   $('selectedWalkLabel').textContent='Viewing: '+(Number.isFinite(date)?new Date(date).toLocaleDateString():'Selected walk')+' · '+peeCount+' pee '+(peeCount===1?'event':'events')+' · '+fmtDistance(walkDistance(walk));
   $('selectedWalkBar').hidden=false;
-  syncSelectedWalkControls();renderExistingData();
+  syncSelectedWalkControls();syncWalkControls();renderExistingData();
   window.scrollTo({top:0,behavior:'smooth'});
   setTimeout(()=>{map.invalidateSize();if(points.length>1)map.fitBounds(L.latLngBounds(points),{padding:[35,35],maxZoom:18});else map.setView(points[0],17);},130);
   toast('Showing selected walk · teal route');
 }
 function exitHistoryWalk(){
-  finishGpsReview();selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;
+  finishGpsReview();selectedHistoryWalkIndex=null;selectedWalkLayer.clearLayers();$('selectedWalkBar').hidden=true;syncWalkControls();
   // Restore the exact map configuration from before Individual Walk View.
   // The historical pee heatmap can be toggled independently while viewing a walk.
   if(preWalkViewMapState){
