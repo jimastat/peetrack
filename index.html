@@ -307,7 +307,7 @@ body.walk-active #map{height:clamp(250px,calc(100dvh - 310px),490px)}
 .walk-operations[hidden]{display:none!important}
 @media(max-width:360px){body.walk-active #peeBtn{font-size:16px}body.walk-active #undoPeeBtn{font-size:11px}}
 
-/* v1.5.1: one contextual map toolbar, expandable map options. */
+/* v1.5.2: one contextual map toolbar, expandable map options. */
 .walk-operations{position:relative;padding:9px 11px 10px}
 .walk-operations-head{display:none!important}
 .walk-operations .action-grid{margin:0}
@@ -329,6 +329,11 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
 .walk-operations .history-panel #routeSelector{flex-wrap:wrap;gap:7px}
 .walk-operations .history-panel #walkHistoryBtn{margin-top:9px}
 @media(max-width:360px){#mapOptionsToggle{font-size:11px;gap:4px}body:not(.walk-active) #startBtn{font-size:12px;padding:7px}}
+
+/* v1.5.2: history is navigation, not a map setting. */
+.walk-operations .walk-history-link{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;margin-top:7px;padding:8px 12px;background:#f1f5f8;border:1px solid #dbe4ed;border-radius:10px;color:#31566b;font-size:13px;font-weight:650;text-align:left;box-shadow:none}
+.walk-operations .walk-history-link span{font-size:20px;line-height:1}
+body.walk-active .walk-operations .walk-history-link{display:none}
 </style>
 </head>
   
@@ -368,8 +373,9 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
     <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
     <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
     <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
-    <button type="button" id="walkHistoryBtn" class="walk-history-open">📅 View Walk History <span>›</span></button>
+
   </section>
+    <button type="button" id="walkHistoryBtn" class="walk-history-open walk-history-link">◷ &nbsp;Walk History <span>›</span></button>
   </section>
 
   <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><div class="selected-walk-actions"><button type="button" id="reviewSelectedWalk">GPS Review</button><button type="button" id="exitWalkView">Exit walk view ✕</button></div></div>
@@ -422,7 +428,7 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.1</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.2</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1122,8 +1128,14 @@ function logPeeEvent(){
       const{latitude,longitude,accuracy}=pos.coords;
       const peeEvent={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy,walkId:currentWalkId};
       data.pees.push(peeEvent);saveData();
-      renderExistingData();
-      setStatus(`Pee logged · GPS accuracy ±${Math.round(accuracy)}m`);toast('Pee location saved');resolve();
+      confirmPeeRecorded();
+      setStatus(`Pee logged · GPS accuracy ±${Math.round(accuracy)}m`);
+      // Let the success state paint before heavier marker/heatmap updates.
+      requestAnimationFrame(()=>setTimeout(()=>{
+        renderExistingData();
+        toast('Pee location saved');
+      },0));
+      resolve();
     },err=>{setStatus('Could not get location: '+err.message);reject(err);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   });
 }
@@ -1139,9 +1151,19 @@ function confirmPeeRecorded(){
     button.classList.remove('pee-confirmed');
     button.textContent='📍  Pee Here!';
     peeConfirmTimer=null;
-  },800);
+  },300);
 }
-$('peeBtn').addEventListener('click',()=>logPeeEvent().then(confirmPeeRecorded).catch(()=>{}));
+let peeLogPending=false;
+$('peeBtn').addEventListener('click',()=>{
+  if(peeLogPending)return;
+  peeLogPending=true;
+  const button=$('peeBtn');
+  button.textContent='📍 Locating…';
+  logPeeEvent().catch(()=>{
+    button.classList.remove('pee-confirmed');
+    button.textContent='📍  Pee Here!';
+  }).finally(()=>{peeLogPending=false;});
+});
 let undoPeeConfirmTimer=null;
 function confirmPeeUndone(){
   const button=$('undoPeeBtn');
@@ -1152,7 +1174,7 @@ function confirmPeeUndone(){
     button.classList.remove('undo-confirmed');
     button.textContent='↶  Undo last pee';
     undoPeeConfirmTimer=null;
-  },800);
+  },300);
 }
 $('undoPeeBtn').addEventListener('click',()=>{
   if(!data.pees.length)return;
