@@ -335,12 +335,25 @@ body.walk-active #mapOptionsToggle{margin-top:8px;width:100%;min-height:36px;pad
 .walk-operations .walk-history-link span{font-size:20px;line-height:1}
 body.walk-active .walk-operations .walk-history-link{display:none}
 
-/* v1.5.5: single pee markers sit above route overlays, like numbered clusters. */
+/* v1.5.6: single pee markers sit above route overlays, like numbered clusters. */
 .pee-single-icon{background:transparent;border:0}
 .pee-single-icon .pee-single-dot{position:absolute;left:11px;top:11px;width:14px;height:14px;box-sizing:border-box;border-radius:50%;display:flex;align-items:center;justify-content:center}
 .pee-single-icon .pee-single-dot.historical{background:#f4b52c;border:2px solid #a65e00}
 .pee-single-icon .pee-single-dot.latest{background:#008c95;border:2px solid #00646b}
 .pee-single-icon .pee-single-dot i{width:5px;height:5px;background:#fff;border-radius:50%}
+
+/* v1.5.6: repurpose the history row for compact live walk stats. */
+.live-walk-dashboard{margin-top:6px;padding:8px 10px 9px;border:1px solid #dbe4ed;border-radius:10px;background:#f1f5f8;color:#264456}
+.live-walk-heading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:10px;font-weight:750;letter-spacing:.07em;color:#5c7180}
+.live-walk-heading #liveGpsStatus{font-size:10px;font-weight:550;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-walk-dot{display:inline-block;width:7px;height:7px;background:#258447;border-radius:50%;margin-right:4px}
+.live-walk-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.live-walk-stats>div{min-width:0;padding:6px 4px;text-align:center;border-radius:8px;background:#fff}
+.live-walk-stats small{display:block;color:#667e8e;font-size:9px;font-weight:700;letter-spacing:.04em}
+.live-walk-stats strong{display:block;font-size:19px;line-height:1.4;font-variant-numeric:tabular-nums;white-space:nowrap}
+.live-walk-stats em{font-style:normal;font-size:11px;font-weight:550}
+body.walk-active .live-walk-dashboard{display:block}
+body:not(.walk-active) .live-walk-dashboard{display:none}
 </style>
 </head>
   
@@ -383,6 +396,14 @@ body.walk-active .walk-operations .walk-history-link{display:none}
 
   </section>
     <button type="button" id="walkHistoryBtn" class="walk-history-open walk-history-link">📅 View Walk History <span>›</span></button>
+    <div id="liveWalkDashboard" class="live-walk-dashboard" hidden aria-label="Current walk statistics">
+      <div class="live-walk-heading"><span><span class="live-walk-dot"></span> CURRENT WALK</span><span id="liveGpsStatus">GPS starting…</span></div>
+      <div class="live-walk-stats">
+        <div><small>DISTANCE</small><strong id="liveWalkDistance">0.00 <em>mi</em></strong></div>
+        <div><small>ELAPSED</small><strong id="liveWalkElapsed">00:00</strong></div>
+        <div><small>PEES</small><strong id="liveWalkPees">0</strong></div>
+      </div>
+    </div>
   </section>
 
   <div id="selectedWalkBar" class="selected-walk-bar" hidden><span id="selectedWalkLabel">Viewing a walk</span><div class="selected-walk-actions"><button type="button" id="reviewSelectedWalk">GPS Review</button><button type="button" id="exitWalkView">Exit walk view ✕</button></div></div>
@@ -435,7 +456,7 @@ body.walk-active .walk-operations .walk-history-link{display:none}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.5</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.6</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1083,8 +1104,19 @@ function setMapOptionsExpanded(expanded){
   $('mapOptionsChevron').textContent=mapOptionsExpanded?'⌃':'⌄';
 }
 $('mapOptionsToggle').addEventListener('click',()=>setMapOptionsExpanded(!mapOptionsExpanded));
+let walkDashboardStartedAt=0;
+let walkDashboardTimer=null;
+function updateLiveWalkDashboard(){
+  if(!isWalking)return;
+  $('liveWalkDistance').innerHTML=(pathDistance(currentWalkCoords)/1609.344).toFixed(2)+' <em>mi</em>';
+  const elapsed=Math.max(0,Math.floor((Date.now()-walkDashboardStartedAt)/1000));
+  const hours=Math.floor(elapsed/3600),minutes=Math.floor((elapsed%3600)/60),seconds=elapsed%60;
+  $('liveWalkElapsed').textContent=(hours?hours+':':'')+String(minutes).padStart(2,'0')+':'+String(seconds).padStart(2,'0');
+  $('liveWalkPees').textContent=String(data.pees.filter(p=>String(p.walkId)===String(currentWalkId)).length);
+}
 function syncWalkControls(){
   document.body.classList.toggle('walk-active',isWalking);
+  $('liveWalkDashboard').hidden=!isWalking;
   const hiddenForHistory=!isWalking&&(selectedHistoryWalkIndex!==null||!!gpsReviewState);
   $('walkOperations').hidden=hiddenForHistory;
   $('mapOptionsToggle').hidden=hiddenForHistory;
@@ -1098,6 +1130,11 @@ function startWalk(){
   if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
   setMapOptionsExpanded(false);
   isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
+  walkDashboardStartedAt=Date.now();
+  $('liveGpsStatus').textContent='GPS starting…';
+  if(walkDashboardTimer!==null)clearInterval(walkDashboardTimer);
+  walkDashboardTimer=setInterval(updateLiveWalkDashboard,1000);
+  updateLiveWalkDashboard();
   if(walkPolyline)map.removeLayer(walkPolyline);
   walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
   $('walkBadge').textContent='WALK IN PROGRESS';$('walkBadge').classList.add('live');
@@ -1108,14 +1145,18 @@ function startWalk(){
     const point={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy};
     currentWalkCoords.push(point);walkPolyline.addLatLng([latitude,longitude]);placeCurrentMarker(latitude,longitude);
     map.panTo([latitude,longitude],{animate:false});
+    $('liveGpsStatus').textContent='GPS ±'+Math.round(accuracy)+'m';
+    updateLiveWalkDashboard();
     const distance=pathDistance(currentWalkCoords);
     $('walkStatus').textContent=fmtDistance(distance);
     setStatus(`Tracking walk · ${fmtDistance(distance)} · GPS ±${Math.round(accuracy)}m`);
-  },err=>setStatus('GPS error: '+err.message),{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
+  },err=>{setStatus('GPS error: '+err.message);$('liveGpsStatus').textContent='GPS unavailable';},{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
 }
 function endWalk(){
   if(!isWalking){setStatus('No walk is currently in progress.');return;}
-  isWalking=false;if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
+  isWalking=false;
+  if(walkDashboardTimer!==null){clearInterval(walkDashboardTimer);walkDashboardTimer=null;}
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
   if(currentWalkCoords.length){
     const startTime=currentWalkCoords[0].timestamp,endTime=currentWalkCoords[currentWalkCoords.length-1].timestamp;
     const savedWalk={id:currentWalkId,startTime,endTime,path:currentWalkCoords};
@@ -1140,6 +1181,7 @@ function logPeeEvent(){
       const{latitude,longitude,accuracy}=pos.coords;
       const peeEvent={lat:latitude,lng:longitude,timestamp:Date.now(),accuracy,walkId:currentWalkId};
       data.pees.push(peeEvent);saveData();
+      updateLiveWalkDashboard();
       confirmPeeRecorded();
       setStatus(`Pee logged · GPS accuracy ±${Math.round(accuracy)}m`);
       // Let the success state paint before heavier marker/heatmap updates.
@@ -1193,7 +1235,7 @@ function confirmPeeUndone(){
 }
 $('undoPeeBtn').addEventListener('click',()=>{
   if(!data.pees.length)return;
-  data.pees.pop();saveData();map.closePopup();renderExistingData();
+  data.pees.pop();saveData();updateLiveWalkDashboard();map.closePopup();renderExistingData();
   setStatus('Last pee entry removed.');toast('Last pee undone');
   confirmPeeUndone();
 });
