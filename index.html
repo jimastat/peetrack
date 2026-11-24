@@ -415,6 +415,14 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 
 /* Main map selection: paint-only ring, no marker geometry changes. */
 .pee-single-icon .pee-single-dot.is-selected,.cluster-icon .cluster-bubble.is-selected{outline:2px solid #006970;outline-offset:2px;box-shadow:0 0 0 2px #fff;}
+
+/* v1.5.22: integrated sticky application header; preserve artwork and inner sizing. */
+#app{--app-gutter:10px;padding-top:0}
+#app > header{top:env(safe-area-inset-top,0px);margin-inline:calc(-1 * var(--app-gutter));border-radius:0;box-shadow:0 2px 5px #14223824}
+#app > header.header-scrolled{box-shadow:0 2px 6px #14223838}
+#app > header::before{content:"";position:absolute;inset:auto 0 100%;height:env(safe-area-inset-top,0px);background:linear-gradient(120deg,#102c19,#193d24);pointer-events:none}
+@media(max-width:420px){#app{--app-gutter:8px;padding-top:0}}
+@media(min-width:700px){#app{--app-gutter:18px;padding-top:0}}
 </style>
 </head>
   
@@ -518,7 +526,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.21</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.22</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
