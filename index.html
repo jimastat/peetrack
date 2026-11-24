@@ -439,6 +439,8 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
 #app > header .stevie-avatar{width:68px;height:68px;flex-basis:68px}
 #app > header #walkBadge{flex:0 0 78px;width:78px;text-align:center;padding-inline:0}
 @media(max-width:420px){#app > header .stevie-avatar{width:63px;height:63px;flex-basis:63px}#app > header #walkBadge{flex-basis:68px;width:68px}}
+
+.rank-list .insight-favorite-row{align-items:center;gap:6px}.insight-favorite-name{display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-width:0;flex:1}.rank-list .favorite-name-link{width:auto;min-width:0;overflow-wrap:anywhere}.insight-favorite-actions{display:inline-flex;align-items:center;flex-shrink:0}.insight-favorite-actions .location-name-action{min-height:28px;min-width:26px}.rank-list .favorite-count-link{width:auto;flex-shrink:0;white-space:nowrap}
 </style>
 </head>
   
@@ -544,7 +546,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.24</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.25</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1088,7 +1090,15 @@ function updateInsights(){
   $('repeatRate').textContent=valid.length?(100*repeatEvents/valid.length).toFixed(0)+'%':'—';
   const list=$('favoriteList');list.innerHTML='';
   if(!clusters.length)list.innerHTML='<li>Not enough location data yet</li>';
-  else {const context=favoriteContext();peeLocationsRankedGroups().slice(0,5).forEach((c,i)=>{const li=document.createElement('li');const btn=document.createElement('button');btn.type='button';btn.className='favorite-area';btn.innerHTML=`<span> #${i+1} – ${htmlName(namedLocation(locationInfo(c.events,context).single)?.name||'Favorite Location')}</span><b>${c.events.length} ${c.events.length===1?'pee':'pees'} ↗</b>`;btn.addEventListener('click',()=>showFavoriteArea(c));li.appendChild(btn);list.appendChild(li);});}
+  else {const context=favoriteContext();peeLocationsRankedGroups().slice(0,5).forEach((c,i)=>{
+    const li=document.createElement('li');li.className='insight-favorite-row';
+    const group=locationInfo(c.events,context).single;
+    const title=document.createElement('button');title.type='button';title.className='favorite-area favorite-name-link';title.innerHTML=`<span>#${i+1} – ${htmlName(namedLocation(group)?.name||'Favorite Location')}</span>`;
+    const controls=document.createElement('span');controls.className='insight-favorite-actions';controls.innerHTML=nameControls(group);
+    const count=document.createElement('button');count.type='button';count.className='favorite-area favorite-count-link';count.innerHTML=`<b>${c.events.length} ${c.events.length===1?'pee':'pees'} ↗</b>`;
+    title.addEventListener('click',()=>showFavoriteArea(c));count.addEventListener('click',()=>showFavoriteArea(c));
+    const left=document.createElement('div');left.className='insight-favorite-name';left.append(title,controls);li.append(left,count);list.appendChild(li);
+  });}
   $('longestWalkMapBtn').disabled=insightRecordWalkIndex('longest')<0;
   $('mostPeesWalkMapBtn').disabled=insightRecordWalkIndex('pees')<0;
   $('insightsPeriods').querySelectorAll('button').forEach(b=>{const active=b.dataset.insightPeriod===insightsPeriod;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
@@ -1156,6 +1166,7 @@ function nameControls(g){
   return `<button type="button" class="location-name-action" data-name-index="${key}" aria-label="${n?'Rename':'Name'} location" title="${n?'Rename':'Name'} location">✎</button>${n?`<button type="button" class="location-name-action" data-clear-name="${key}" aria-label="Clear location name" title="Clear location name">⊗</button>`:''}`;
 }
 let pendingLocationNameIndex=null;
+let pendingLocationNameFromInsights=false;
 function openLocationNameDialog(index,g,old){
   pendingLocationNameIndex=index;
   $('locationNameTitle').textContent=old?'Rename pee location':'Name pee location';
@@ -1168,15 +1179,15 @@ $('locationNameInput').addEventListener('input',()=>{$('locationNameSave').disab
 $('locationNameCancel').addEventListener('click',()=>$('locationNameDialog').close());
 $('locationNameDialog').addEventListener('close',()=>{pendingLocationNameIndex=null;});
 $('locationNameForm').addEventListener('submit',e=>{
-  e.preventDefault();const name=$('locationNameInput').value.trim(),index=pendingLocationNameIndex;
+  e.preventDefault();const name=$('locationNameInput').value.trim(),index=pendingLocationNameIndex,fromInsights=pendingLocationNameFromInsights;
   if(!name||index===null)return;
-  $('locationNameDialog').close();editLocationName(index,false,name);
+  $('locationNameDialog').close();editLocationName(index,false,name,fromInsights);
 });
-function editLocationName(index,clear,enteredName){
+function editLocationName(index,clear,enteredName,fromInsights=false){
   const g=favoriteContext().get(data.pees[index]);if(!g)return;
   const old=namedLocation(g);let name;
   if(clear){if(!old||!confirm('Clear this location name? Pee events will be kept.'))return;}
-  else{if(enteredName===undefined){openLocationNameDialog(index,g,old);return;}name=enteredName.trim().slice(0,80);if(!name)return;}
+  else{if(enteredName===undefined){pendingLocationNameFromInsights=fromInsights;openLocationNameDialog(index,g,old);return;}name=enteredName.trim().slice(0,80);if(!name)return;}
   data.locationNames=data.locationNames||[];
   if(old){if(clear)data.locationNames=data.locationNames.filter(n=>n!==old);else old.name=name;}
   else if(!clear)data.locationNames.push({...g.center,name});
@@ -1186,14 +1197,14 @@ function editLocationName(index,clear,enteredName){
     peeLocationsMarkers.eachLayer(layer=>{if(layer.isPopupOpen()&&layer._locationEvents?.some(e=>g.events.includes(e)))reopenEvent=layer._locationEvents[0];});
     drawPeeLocations(reopenEvent?data.pees.indexOf(reopenEvent):null);
   }
-  else peeMarkersLayer.eachLayer(layer=>{if(layer._favoriteEventIndices?.includes(index))layer.openPopup();});
+  else if(!fromInsights)peeMarkersLayer.eachLayer(layer=>{if(layer._favoriteEventIndices?.includes(index))layer.openPopup();});
 }
 const favoriteStar='<svg class="favorite-star" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 0 13 6.5 20 7.5 15 12.5 16.5 20 10 16.5 3.5 20 5 12.5 0 7.5 7 6.5Z"/></svg>';
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-name-index],[data-clear-name],[data-favorite-rank]');if(!b)return;
   e.preventDefault();e.stopPropagation();
   if(b.hasAttribute('data-favorite-rank')){const marker=peeMarkersLayer.getLayers().find(l=>l.isPopupOpen());openPeeLocations('favorites',true,marker?._favoriteEventIndices||[]);map.closePopup();return;}
-  editLocationName(Number(b.dataset.nameIndex??b.dataset.clearName),b.hasAttribute('data-clear-name'));
+  editLocationName(Number(b.dataset.nameIndex??b.dataset.clearName),b.hasAttribute('data-clear-name'),undefined,!!b.closest('#favoriteList'));
 },true);
 let favoriteAllTimeOverride=false;
 let peeLocationsReturn=null;
