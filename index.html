@@ -434,6 +434,11 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 #app{padding-top:calc(var(--app-header-height) + 12px)}
 @media(max-width:420px){#app{padding-top:calc(var(--app-header-height) + 9px)}}
 body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
+/* v1.5.24: slightly larger portrait and stable status width. */
+#app > header{min-height:86px}
+#app > header .stevie-avatar{width:68px;height:68px;flex-basis:68px}
+#app > header #walkBadge{flex:0 0 78px;width:78px;text-align:center;padding-inline:0}
+@media(max-width:420px){#app > header .stevie-avatar{width:63px;height:63px;flex-basis:63px}#app > header #walkBadge{flex-basis:68px;width:68px}}
 </style>
 </head>
   
@@ -539,7 +544,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.23</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.24</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -1330,7 +1335,7 @@ function startWalk(){
   updateLiveWalkDashboard();
   if(walkPolyline)map.removeLayer(walkPolyline);
   walkPolyline=L.polyline([],{color:'#21843b',weight:5}).addTo(map);
-  $('walkBadge').textContent='WALK IN PROGRESS';$('walkBadge').classList.add('live');
+  $('walkBadge').textContent='WALKING';$('walkBadge').classList.add('live');
   $('walkStatus').textContent='0.00 mi';syncWalkControls();
   setStatus('Starting GPS tracking…');
   watchId=navigator.geolocation.watchPosition(pos=>{
