@@ -412,6 +412,9 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 #locationNameInput{padding:9px 10px;border-radius:8px;outline:none}
 #locationNameInput:focus{border-color:#6293c4;box-shadow:0 0 0 1px #6293c4}
 .location-name-buttons{margin-top:10px;gap:8px}.location-name-buttons button{padding:9px;min-height:44px;font-size:14px}
+
+/* Main map selection: paint-only ring, no marker geometry changes. */
+.pee-single-icon .pee-single-dot.is-selected,.cluster-icon .cluster-bubble.is-selected{outline:2px solid #006970;outline-offset:2px;box-shadow:0 0 0 2px #fff;}
 </style>
 </head>
   
@@ -515,7 +518,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.20</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.21</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -793,12 +796,16 @@ function renderPeeMarkers(){
         .bindPopup(popupForGroup(g,info),{maxWidth:290,autoPan:false})
         .addTo(peeMarkersLayer);
       marker._favoriteEventIndices=g.events.map(e=>e._index);
+      marker.on('popupopen',()=>marker.getElement()?.querySelector('.pee-single-dot,.cluster-bubble')?.classList.add('is-selected'));
+      marker.on('popupclose',()=>marker.getElement()?.querySelector('.pee-single-dot,.cluster-bubble')?.classList.remove('is-selected'));
     }else{
       const diameter=count>=100?47:count>=10?42:36;
       const className=latestOnly?'latest-only':mixed?'mixed':count>=10?'many':'';
       const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${className}${info.star?' favorite-cluster':''}">${info.star?favoriteStar:''}<span>${count}</span></div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
       const marker=L.marker([g.lat,g.lng],{icon}).addTo(peeMarkersLayer);
       marker._favoriteEventIndices=g.events.map(e=>e._index);
+      marker.on('popupopen',()=>marker.getElement()?.querySelector('.pee-single-dot,.cluster-bubble')?.classList.add('is-selected'));
+      marker.on('popupclose',()=>marker.getElement()?.querySelector('.pee-single-dot,.cluster-bubble')?.classList.remove('is-selected'));
       marker.bindPopup(popupForGroup(g,info),{maxWidth:290,autoPan:false});
     }
   });
