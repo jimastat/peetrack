@@ -387,6 +387,8 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 .walk-history-actions .gps-review-route-icon{display:inline-block;width:21px;height:21px;vertical-align:middle;margin-right:5px}
 
 .hydrant-icon{width:1em;height:1em;display:block}
+
+.location-popup-heading{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-right:8px}.location-popup-heading>span{flex:1;overflow-wrap:anywhere}.location-name-action{border:0;background:transparent;color:#64748b;font-size:17px;padding:3px 5px;cursor:pointer;line-height:1}.favorite-rank{background:#008c95;color:white;border:0;border-radius:7px;padding:4px 6px;font-weight:700}.favorite-star{width:9px;height:9px;color:#925b08;flex-shrink:0}.latest .favorite-star,.latest-only .favorite-star,.many .favorite-star{color:white}.favorite-cluster{gap:2px}.favorite-cluster .favorite-star{width:11px;height:11px}.pee-location-entry{cursor:pointer}.pee-location-entry>span{overflow-wrap:anywhere;min-width:0}
 </style>
 </head>
   
@@ -490,7 +492,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.15</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.16</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -578,11 +580,13 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 /* Existing storage key and record structure are retained for compatibility. */
 const STORE_KEY='peeTrackerData';
 function loadData(){
-  try{const raw=localStorage.getItem(STORE_KEY);if(!raw)return{walks:[],pees:[]};const d=JSON.parse(raw);return{walks:Array.isArray(d.walks)?d.walks:[],pees:Array.isArray(d.pees)?d.pees:[]};}
+  try{const raw=localStorage.getItem(STORE_KEY);if(!raw)return{walks:[],pees:[]};const d=JSON.parse(raw);return{walks:Array.isArray(d.walks)?d.walks:[],pees:Array.isArray(d.pees)?d.pees:[],locationNames:cleanNames(d.locationNames)};}
   catch(e){console.error('Could not read saved data',e);return{walks:[],pees:[]};}
 }
 function saveData(){localStorage.setItem(STORE_KEY,JSON.stringify(data));}
+function cleanNames(items){return Array.isArray(items)?items.filter(n=>n&&typeof n.name==='string'&&n.name.trim()&&Number.isFinite(n.lat)&&Number.isFinite(n.lng)).map(n=>({lat:n.lat,lng:n.lng,name:n.name.trim().slice(0,80)})):[];}
 let data=loadData();
+data.locationNames=cleanNames(data.locationNames);
 const PREFS_KEY='peeTrackerPreferences';
 const DEFAULT_PREFS={name:'Stevie',breed:'Labrador Retriever',weight:75,height:null,sex:'female',showPawSteps:true,offerGapReview:false,peeLocationRadius:20};
 function sanitizePrefs(raw){
@@ -718,7 +722,7 @@ function latestPeeContext(){
 function updateLatestPeeLegend(){
   $('latestPeeLegend').hidden=!latestPeeContext();
 }
-function popupForGroup(g){
+function popupForGroup(g,info=locationInfo(g.events,favoriteContext())){
   const events=g.events.slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   const dates=events.map(e=>new Date(e.timestamp).getTime()).filter(Number.isFinite);
   // Resolve walk membership from saved walk IDs, falling back to walk time windows
@@ -732,16 +736,20 @@ function popupForGroup(g){
     else if(e.walkId!=null)distinctWalks.add(String(e.walkId));
   });
   const dateText=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-  const heading=events.length===1?'Pee location':`${events.length} pee events nearby`;
+  const heading=namedLocation(info.single)?.name||(events.length===1?'Pee location':`${events.length} pee events nearby`);
+  const rank=info.single?.rank;
+  const controls=nameControls(info.single)+(rank&&rank<=5?`<button type="button" class="favorite-rank" data-favorite-rank="${rank}" title="All-time favorite locations">#${rank}</button>`:'');
   const meta=events.length===1?'':`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walks: ${distinctWalks.size}<br>`:''}`;
   const latestIds=latestPeeContext();
   const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${latestIds?.has(e._index)?'<span class="visit-latest">Latest walk</span>':''}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
-  return `<div class="visit-popup"><h3>${heading}</h3>${meta?`<div class="visit-meta">${meta}</div>`:''}<div class="visit-list">${rows}</div></div>`;
+  return `<div class="visit-popup"><h3 class="location-popup-heading"><span>${htmlName(heading)}</span>${controls}</h3>${meta?`<div class="visit-meta">${meta}</div>`:''}<div class="visit-list">${rows}</div></div>`;
 }
 function renderPeeMarkers(){
   peeMarkersLayer.clearLayers();
   const latestIds=latestPeeContext();
+  const context=favoriteContext();
   groupVisiblePees().forEach(g=>{
+    const info=locationInfo(g.events,context);
     const count=g.events.length;
     const latestCount=latestIds?g.events.filter(e=>latestIds.has(e._index)).length:0;
     const latestOnly=latestIds&&latestCount===count;
@@ -754,18 +762,20 @@ function renderPeeMarkers(){
       const dotClass=latest?'latest':'historical';
       const icon=L.divIcon({
         className:'pee-single-icon',
-        html:`<span class="pee-single-dot ${dotClass}">${latest?'<i></i>':''}</span>`,
+        html:`<span class="pee-single-dot ${dotClass}">${info.star?favoriteStar:latest?'<i></i>':''}</span>`,
         iconSize:[36,36],iconAnchor:[18,18],popupAnchor:[0,-10]
       });
-      L.marker([g.lat,g.lng],{icon,keyboard:true})
-        .bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false})
+      const marker=L.marker([g.lat,g.lng],{icon,keyboard:true})
+        .bindPopup(popupForGroup(g,info),{maxWidth:290,autoPan:false})
         .addTo(peeMarkersLayer);
+      marker._favoriteEventIndices=g.events.map(e=>e._index);
     }else{
       const diameter=count>=100?47:count>=10?42:36;
       const className=latestOnly?'latest-only':mixed?'mixed':count>=10?'many':'';
-      const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${className}">${count}</div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
+      const icon=L.divIcon({className:'cluster-icon',html:`<div class="cluster-bubble ${className}${info.star?' favorite-cluster':''}">${info.star?favoriteStar:''}<span>${count}</span></div>`,iconSize:[diameter,diameter],iconAnchor:[diameter/2,diameter/2]});
       const marker=L.marker([g.lat,g.lng],{icon}).addTo(peeMarkersLayer);
-      marker.bindPopup(popupForGroup(g),{maxWidth:290,autoPan:false});
+      marker._favoriteEventIndices=g.events.map(e=>e._index);
+      marker.bindPopup(popupForGroup(g,info),{maxWidth:290,autoPan:false});
     }
   });
   updateLatestPeeLegend();
@@ -1057,18 +1067,62 @@ function peeEventWalkKey(p){
   const w=data.walks.find(w=>t>=walkStart(w)&&t<=Number(w.endTime)+120000);
   return w?String(w.id??w.startTime):null;
 }
-function peeLocationsRankedGroups(){
-  const start=insightPeriodStart(),end=Date.now();
+function peeLocationsRankedGroups(allTime=false){
+  const start=allTime?-Infinity:insightPeriodStart(),end=Date.now();
   const valid=data.pees.filter(p=>{const t=new Date(p.timestamp).getTime();return Number.isFinite(t)&&t>=start&&t<=end&&Number.isFinite(p.lat)&&Number.isFinite(p.lng);});
   return clusterPees(valid,prefs.peeLocationRadius).map(c=>{
     const walks=new Set(c.events.map(peeEventWalkKey).filter(Boolean));
     return {...c,walkCount:walks.size,first:Math.min(...c.events.map(p=>new Date(p.timestamp).getTime())),last:Math.max(...c.events.map(p=>new Date(p.timestamp).getTime()))};
   }).sort((a,b)=>b.events.length-a.events.length||b.walkCount-a.walkCount||b.last-a.last);
 }
-function openPeeLocations(mode){
+// Resolve visible events against the same all-time geographic ranking.
+function favoriteContext(){
+  const groups=peeLocationsRankedGroups(true), byEvent=new Map();
+  groups.forEach((g,i)=>{g.rank=i+1;g.events.forEach(e=>byEvent.set(e,g));});
+  return byEvent;
+}
+function locationInfo(events,context){
+  const groups=events.map(e=>context.get(e._index===undefined?e:data.pees[e._index]));
+  return {single:groups.length&&groups[0]&&groups.every(g=>g===groups[0])?groups[0]:null,star:groups.length>0&&groups.every(g=>g&&g.rank<=5)};
+}
+function namedLocation(g){
+  if(!g)return null;
+  let best=null,distance=Infinity;
+  for(const n of data.locationNames||[]){const d=haversine(n,g.center);if(d<prefs.peeLocationRadius&&d<distance){best=n;distance=d;}}
+  return best;
+}
+function htmlName(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function nameControls(g){
+  if(!g)return '';
+  const n=namedLocation(g), key=data.pees.indexOf(g.events[0]);
+  if(key<0)return '';
+  return `<button type="button" class="location-name-action" data-name-index="${key}" aria-label="${n?'Rename':'Name'} location" title="${n?'Rename':'Name'} location">✎</button>${n?`<button type="button" class="location-name-action" data-clear-name="${key}" aria-label="Clear location name" title="Clear location name">⊗</button>`:''}`;
+}
+function editLocationName(index,clear){
+  const g=favoriteContext().get(data.pees[index]);if(!g)return;
+  const old=namedLocation(g);let name;
+  if(clear){if(!old||!confirm('Clear this location name? Pee events will be kept.'))return;}
+  else{const entered=prompt('Location name',old?.name||'');if(entered===null||!entered.trim())return;name=entered.trim().slice(0,80);}
+  data.locationNames=data.locationNames||[];
+  if(old){if(clear)data.locationNames=data.locationNames.filter(n=>n!==old);else old.name=name;}
+  else if(!clear)data.locationNames.push({...g.center,name});
+  saveData();renderPeeMarkers();updateInsights();
+  if(!$('peeLocationsOverlay').hidden)drawPeeLocations();
+  else peeMarkersLayer.eachLayer(layer=>{if(layer._favoriteEventIndices?.includes(index))layer.openPopup();});
+}
+const favoriteStar='<svg class="favorite-star" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 0 13 6.5 20 7.5 15 12.5 16.5 20 10 16.5 3.5 20 5 12.5 0 7.5 7 6.5Z"/></svg>';
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-name-index],[data-clear-name],[data-favorite-rank]');if(!b)return;
+  e.preventDefault();e.stopPropagation();
+  if(b.hasAttribute('data-favorite-rank')){map.closePopup();openPeeLocations('favorites',true);return;}
+  editLocationName(Number(b.dataset.nameIndex??b.dataset.clearName),b.hasAttribute('data-clear-name'));
+},true);
+let favoriteAllTimeOverride=false;
+function openPeeLocations(mode,allTime=false){
+  favoriteAllTimeOverride=allTime;
   peeLocationsMode=mode;
   $('peeLocationsTitle').textContent=mode==='unique'?'Unique Pee Locations':'Favorite Pee Locations';
-  $('peeLocationsSubtitle').textContent=`${$('insightsPeriods').querySelector('button.active')?.textContent||'Selected period'} · ${prefs.peeLocationRadius} m grouping radius`;
+  $('peeLocationsSubtitle').textContent=`${allTime?'All Time':($('insightsPeriods').querySelector('button.active')?.textContent||'Selected period')} · ${prefs.peeLocationRadius} m grouping radius`;
   $('peeFavoritesControls').hidden=mode!=='favorites';
   $('peeLocationsOverlay').hidden=false;document.body.style.overflow='hidden';
   if(!peeLocationsMap){
@@ -1092,7 +1146,8 @@ function peeLocationDetail(g,rank){
 }
 function drawPeeLocations(){
   if(!peeLocationsMap)return;
-  const all=peeLocationsRankedGroups();
+  const all=peeLocationsRankedGroups(favoriteAllTimeOverride);
+  const context=favoriteContext();
   const limit=$('peeFavoritesLimit').value;
   peeLocationsGroups=peeLocationsMode==='favorites'&&limit!=='all'?all.slice(0,Number(limit)):all;
   peeLocationsMarkers.clearLayers();
@@ -1104,13 +1159,16 @@ function drawPeeLocations(){
     const rank=i+1,number=peeLocationsMode==='favorites'?rank:g.events.length;
     const bubble=L.divIcon({className:'',html:`<div class="pee-location-bubble ${peeLocationsMode==='favorites'?'favorite':''}">${number}</div>`,iconSize:[32,32],iconAnchor:[16,16]});
     const marker=L.marker([g.center.lat,g.center.lng],{icon:bubble}).bindPopup(peeLocationDetail(g,rank)).addTo(peeLocationsMarkers);
-    const button=document.createElement('button');button.type='button';button.className='pee-location-entry';
-    const title=document.createElement('span');title.textContent=peeLocationsMode==='favorites'?`#${rank} Favorite Location`:`Location ${rank}`;
+    const button=document.createElement('div');button.className='pee-location-entry';
+    const info=locationInfo(g.events,context);
+    const name=namedLocation(info.single)?.name;
+    const title=document.createElement('span');title.textContent=peeLocationsMode==='favorites'?`#${rank} – ${name||'Favorite Location'}`:name||`Location ${rank}`;
+    title.insertAdjacentHTML('beforeend',nameControls(info.single));
     const sub=document.createElement('small');sub.textContent=`${g.walkCount} distinct walks · ${new Date(g.last).toLocaleDateString()} most recent`;
     title.appendChild(sub);
     const count=document.createElement('b');count.textContent=`${g.events.length} ${g.events.length===1?'pee':'pees'}`;
     button.append(title,count);
-    button.addEventListener('click',()=>{peeLocationsMap.setView([g.center.lat,g.center.lng],17);marker.openPopup();});
+    button.addEventListener('click',e=>{if(e.target.closest('button'))return;peeLocationsMap.setView([g.center.lat,g.center.lng],17);marker.openPopup();});
     list.appendChild(button);
   });
 }
@@ -1439,9 +1497,10 @@ $('importFile').addEventListener('change',async event=>{
     const walkKeys=new Set(data.walks.map(fingerprint));
     const newPees=incoming.pees.filter(p=>!peeKeys.has(fingerprint(p)) && (peeKeys.add(fingerprint(p)),true));
     const newWalks=incoming.walks.filter(w=>!walkKeys.has(fingerprint(w)) && (walkKeys.add(fingerprint(w)),true));
-    if(!newPees.length&&!newWalks.length&&!incomingPrefs){toast('All backup records already present');return;}
+    const newNames=cleanNames(incoming.locationNames).filter(n=>!(data.locationNames||[]).some(old=>haversine(n,old)<prefs.peeLocationRadius));
+    if(!newPees.length&&!newWalks.length&&!incomingPrefs&&!newNames.length){toast('All backup records already present');return;}
     if(!confirm(`Import ${newPees.length} pee events and ${newWalks.length} walks? Existing records will be kept.${incomingPrefs?' Imported dog profile/preferences will replace current settings.':''}`))return;
-    const merged={walks:[...data.walks,...newWalks],pees:[...data.pees,...newPees]};
+    const merged={walks:[...data.walks,...newWalks],pees:[...data.pees,...newPees],locationNames:[...(data.locationNames||[]),...newNames]};
     localStorage.setItem(STORE_KEY,JSON.stringify(merged));
     data=merged;
     if(incomingPrefs){prefs=incomingPrefs;localStorage.setItem(PREFS_KEY,JSON.stringify(prefs));}
@@ -1452,7 +1511,7 @@ $('importFile').addEventListener('change',async event=>{
 });
 $('clearBtn').addEventListener('click',()=>{
   if(confirm('Delete ALL walks and pee data from this device? This cannot be undone.')){
-    data={walks:[],pees:[]};saveData();renderExistingData();map.closePopup();setStatus('All records cleared.');toast('All data cleared');
+    data={walks:[],pees:[],locationNames:[]};saveData();renderExistingData();map.closePopup();setStatus('All records cleared.');toast('All data cleared');
   }
 });
 
