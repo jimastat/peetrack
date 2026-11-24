@@ -283,6 +283,13 @@ body.gps-review-active .gps-review-panel .gps-proposal-actions button,body.gps-r
 .pee-location-entry{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 5px;background:transparent;border:0;border-bottom:1px solid #e8edf3;text-align:left;color:#263950;font-size:12px}
 .pee-location-entry small{display:block;color:#748096;margin-top:3px}
 .pee-location-entry b{white-space:nowrap}
+.pee-locations-list{overscroll-behavior:contain;overflow-anchor:none}
+.pee-location-entry.is-selected{background:#e1f1f1;border-radius:6px}
+.pee-location-bubble.favorite.is-selected{outline:3px solid #fff;box-shadow:0 0 0 5px #006970}
+.favorite-location-popup .location-popup-heading{flex-wrap:nowrap;align-items:center;padding-right:0}
+.favorite-location-popup .location-popup-heading strong{min-width:0;overflow-wrap:anywhere}
+.favorite-location-popup .location-name-action{flex-shrink:0}
+.favorite-location-popup .leaflet-popup-content{max-width:calc(100vw - 100px)}
 .pee-location-bubble{display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px;border:2px solid #956e00;background:#f4c54a;color:#302400;font-weight:800;box-shadow:0 1px 5px #0004}
 .pee-location-bubble.favorite{background:#008c95;color:white;border-color:#006970}
 @media(max-width:420px){.pee-locations-sheet{height:94dvh}.pee-locations-toolbar{padding:8px 10px}#peeLocationsMap{height:43%}}
@@ -508,7 +515,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
     </div>
   </section>
 
-  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.19</span></footer>
+  <footer><span id="footerStats">0 walks · 0 pee events logged</span><span class="app-version">Pee Tracker v1.5.20</span></footer>
 </div>
 <div id="peeLocationsOverlay" class="data-overlay" hidden>
   <section class="data-sheet pee-locations-sheet" role="dialog" aria-modal="true" aria-labelledby="peeLocationsTitle">
@@ -753,10 +760,10 @@ function popupForGroup(g,info=locationInfo(g.events,favoriteContext())){
     else if(e.walkId!=null)distinctWalks.add(String(e.walkId));
   });
   const dateText=t=>new Date(t).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
-  const heading=namedLocation(info.single)?.name||(events.length===1?'Pee location':`${events.length} pee events nearby`);
+  const heading=namedLocation(info.single)?.name||(events.length===1?'Pee location':`${events.length} pees nearby`);
   const rank=info.single?.rank;
   const controls=nameControls(info.single)+(rank&&rank<=5?`<button type="button" class="favorite-rank" data-favorite-rank="${rank}" title="All-time favorite locations">#${rank}</button>`:'');
-  const meta=events.length===1?'':`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`Recorded walks: ${distinctWalks.size}<br>`:''}`;
+  const meta=events.length===1?'':`${dates.length?`First: ${dateText(Math.min(...dates))}<br>Latest: ${dateText(Math.max(...dates))}<br>`:''}${distinctWalks.size?`${distinctWalks.size} ${distinctWalks.size===1?'walk':'walks'}<br>`:''}`;
   const latestIds=latestPeeContext();
   const rows=events.map(e=>`<div class="visit-row"><span>${dateText(e.timestamp)}${latestIds?.has(e._index)?'<span class="visit-latest">Latest walk</span>':''}${Number.isFinite(e.accuracy)?`<br><small>GPS ±${Math.round(e.accuracy)}m</small>`:''}</span><button class="visit-delete" type="button" data-pee-index="${e._index}" aria-label="Delete pee from ${dateText(e.timestamp)}">🗑</button></div>`).join('');
   return `<div class="visit-popup"><h3 class="location-popup-heading"><span>${htmlName(heading)}</span>${controls}</h3>${meta?`<div class="visit-meta">${meta}</div>`:''}<div class="visit-list">${rows}</div></div>`;
@@ -1186,7 +1193,9 @@ function peeLocationDetail(g,rank,info){
   const date=t=>new Date(t).toLocaleDateString();
   const name=namedLocation(info.single)?.name;
   const heading=peeLocationsMode==='favorites'?`#${rank} – ${name||'Favorite Location'}`:name||'Pee Location';
-  return `<div class="location-popup-heading"><strong>${htmlName(heading)}</strong>${nameControls(info.single)}</div>${g.walkCount} distinct ${g.walkCount===1?'walk':'walks'} · ${g.events.length} ${g.events.length===1?'event':'events'}<br>First: ${date(g.first)}<br>Latest: ${date(g.last)}`;
+  const single=g.events.length===1;
+  const detail=single?`1 pee<br>${new Date(g.first).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'})}`:`${g.walkCount} ${g.walkCount===1?'walk':'walks'} · ${g.events.length} pees<br>First: ${date(g.first)}<br>Latest: ${date(g.last)}`;
+  return `<div class="location-popup-heading"><strong>${htmlName(heading)}</strong>${nameControls(info.single)}</div>${detail}`;
 }
 function drawPeeLocations(reopenIndex=null){
   if(!peeLocationsMap)return;
@@ -1196,6 +1205,15 @@ function drawPeeLocations(reopenIndex=null){
   peeLocationsGroups=peeLocationsMode==='favorites'&&limit!=='all'?all.slice(0,Number(limit)):all;
   peeLocationsMarkers.clearLayers();
   const list=$('peeLocationsList');list.innerHTML='';
+  const selections=[];
+  function selectFavorite(entry,marker){
+    selections.forEach(({entry:e,marker:m})=>{e.classList.toggle('is-selected',e===entry);m.getElement()?.querySelector('.pee-location-bubble')?.classList.toggle('is-selected',m===marker);});
+    if(!entry)return;
+    const bounds=list.getBoundingClientRect(), row=entry.getBoundingClientRect();
+    const top=bounds.top+list.clientTop,bottom=top+list.clientHeight;
+    const delta=row.top<top?row.top-top:row.bottom>bottom?row.bottom-bottom:0;
+    if(delta)list.scrollTo({top:list.scrollTop+delta,behavior:'smooth'});
+  }
   $('peeLocationsCount').textContent=`${peeLocationsGroups.length} of ${all.length} locations · ${all.reduce((n,g)=>n+g.events.length,0)} pee events`;
   $('peeLocationsFootnote').textContent='Grouped locations are approximate; original pee markers are unchanged.';
   if(!peeLocationsGroups.length){list.textContent='No pee locations for this Insights period.';return;}
@@ -1203,19 +1221,26 @@ function drawPeeLocations(reopenIndex=null){
     const rank=i+1,number=peeLocationsMode==='favorites'?rank:g.events.length;
     const bubble=L.divIcon({className:'',html:`<div class="pee-location-bubble ${peeLocationsMode==='favorites'?'favorite':''}">${number}</div>`,iconSize:[32,32],iconAnchor:[16,16]});
     const info=locationInfo(g.events,context);
-    const marker=L.marker([g.center.lat,g.center.lng],{icon:bubble}).bindPopup(peeLocationDetail(g,rank,info)).addTo(peeLocationsMarkers);
+    const marker=L.marker([g.center.lat,g.center.lng],{icon:bubble}).bindPopup(peeLocationDetail(g,rank,info),peeLocationsMode==='favorites'?{maxWidth:320,minWidth:Math.min(230,Math.max(140,window.innerWidth-100)),className:'favorite-location-popup',autoPan:false,keepInView:false}:{}).addTo(peeLocationsMarkers);
     marker._locationEvents=g.events;
-    if(reopenIndex!==null&&g.events.includes(data.pees[reopenIndex]))marker.openPopup();
+
     const button=document.createElement('div');button.className='pee-location-entry';
     const name=namedLocation(info.single)?.name;
     const title=document.createElement('span');title.textContent=peeLocationsMode==='favorites'?`#${rank} – ${name||'Favorite Location'}`:name||`Location ${rank}`;
     title.insertAdjacentHTML('beforeend',nameControls(info.single));
-    const sub=document.createElement('small');sub.textContent=`${g.walkCount} distinct ${g.walkCount===1?'walk':'walks'} · ${new Date(g.last).toLocaleDateString()} most recent`;
+    const sub=document.createElement('small');sub.textContent=g.events.length===1?new Date(g.last).toLocaleDateString():`${g.walkCount} ${g.walkCount===1?'walk':'walks'} · Last: ${new Date(g.last).toLocaleDateString()}`;
     title.appendChild(sub);
     const count=document.createElement('b');count.textContent=`${g.events.length} ${g.events.length===1?'pee':'pees'}`;
     button.append(title,count);
-    button.addEventListener('click',e=>{if(e.target.closest('button'))return;peeLocationsMap.setView([g.center.lat,g.center.lng],17);marker.openPopup();});
+    const isFavorite=peeLocationsMode==='favorites';
+    button.addEventListener('click',e=>{if(e.target.closest('button'))return;if(!isFavorite||!peeLocationsMap.getBounds().contains(marker.getLatLng()))peeLocationsMap.setView([g.center.lat,g.center.lng],17);marker.openPopup();});
     list.appendChild(button);
+    if(isFavorite){
+      selections.push({entry:button,marker});
+      marker.on('popupopen',()=>selectFavorite(button,marker));
+      marker.on('popupclose',()=>{if(button.classList.contains('is-selected'))selectFavorite(null,null);});
+    }
+    if(reopenIndex!==null&&g.events.includes(data.pees[reopenIndex]))requestAnimationFrame(()=>{if(peeLocationsMarkers.hasLayer(marker))marker.openPopup();});
   });
 }
 function closePeeLocations(){
