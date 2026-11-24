@@ -603,13 +603,12 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
   <section class="data-sheet about-sheet" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
     <div class="data-sheet-head"><button type="button" id="aboutBack" aria-label="Back to Settings">‹</button><h2 id="aboutTitle">About Pee Tracker</h2><button type="button" id="aboutClose" aria-label="Close About and Settings">✕</button></div>
     <div class="about-body">
-      <div class="about-hero"><img id="aboutPortrait" class="about-portrait" alt="Stevie"><img id="aboutLogo" class="about-logo" alt="Pee Tracker"><small id="aboutVersion"></small><p>Every walk tells a story. Every pee leaves a mark.</p></div>
+      <div class="about-hero"><img id="aboutPortrait" class="about-portrait" alt="Stevie"><img id="aboutLogo" class="about-logo" alt="Pee Tracker"><small id="aboutVersion"></small><p>A celebration of Stevie, one walk at a time.</p></div>
       <div class="about-copy">
-        <section><h3>About</h3><p>Created to chronicle Stevie's daily adventures, track her walks and discover her favorite places along the way.</p></section>
+        <section><h3>About</h3><p>Created for Stevie, our pride and joy, because we find endless fascination in everything she does — even where she chooses to pee. What began as a curiosity about her daily habits became a small tribute to a dog who brings immeasurable joy to our lives.</p></section>
         <section><h3>Development</h3><p>Created by Jim Statham, with development assistance from ChatGPT.<br><small>Established November 2026</small></p></section>
         <section><h3>Privacy &amp; data</h3><p>Walk history and pee locations are stored locally in your browser. Regular JSON backups are recommended. External services receive requests for maps and other resources; GPS gap routing may send route coordinates to an external routing service.</p></section>
         <section><h3>Credits</h3><p><a href="https://leafletjs.com/" target="_blank" rel="noopener noreferrer">Leaflet</a> · <a href="https://github.com/Leaflet/Leaflet.heat" target="_blank" rel="noopener noreferrer">Leaflet.heat</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> · <a href="https://pages.github.com/" target="_blank" rel="noopener noreferrer">GitHub Pages</a></p></section>
-        <section><a href="https://github.com/jimastat/peetrack" target="_blank" rel="noopener noreferrer">Project repository ↗</a></section>
       </div><div class="about-dedication">🐾<br>Dedicated to Stevie, Head of Security.</div>
     </div>
   </section>
@@ -1580,7 +1579,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
-const APP_VERSION='1.5.26';
+const APP_VERSION='1.5.28';
 $('appVersionFooter').textContent='Pee Tracker v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
