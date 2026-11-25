@@ -95,6 +95,7 @@ button{font:inherit;cursor:pointer;touch-action:manipulation}
 #routeStyleSelector .route-label{font-size:12px;font-weight:750;color:#35465d}
 #routeStyles{display:flex;gap:4px}
 #routeStyles button{border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;font-size:11px;font-weight:700;padding:7px 11px;min-height:32px}
+@media(max-width:360px){#routeStyleSelector{flex-wrap:wrap}#routeStyles{margin-left:auto}}
 #routeStyles button.active{background:#1769e8;color:white;border-color:#1769e8}
 .walk-density-legend{display:flex;align-items:center;gap:8px;font-size:11px;color:#536175;margin-top:8px}
 .walk-density-legend[hidden]{display:none!important}
@@ -499,7 +500,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
     <div id="routeSelector"><span class="route-label">🗺️ Walk routes</span><div id="routeModes" role="group" aria-label="Walk route display"><button type="button" data-route="off" class="active" aria-pressed="true">Off</button><button type="button" data-route="latest" aria-pressed="false">Latest</button><button type="button" data-route="filtered">Filtered</button></div></div>
     <div id="latestPeeLegend" class="latest-pee-legend" hidden><span><i class="swatch" style="background:#008C95"></i>Latest walk</span><span><i class="swatch" style="background:#E5B700"></i>History</span></div>
     <div id="selectedWalkNote" hidden>Showing selected walk only. Normal route settings return when you exit.</div>
-    <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button></div></div>
+    <div id="routeStyleSelector" hidden><span class="route-label">Route display</span><div id="routeStyles" role="group" aria-label="Filtered route display"><button type="button" data-style="lines" class="active" aria-pressed="true">Lines</button><button type="button" data-style="heatmap">Heatmap</button><button type="button" data-style="frequency">Frequency</button></div></div>
     <div id="walkDensityLegend" class="walk-density-legend" hidden><span>Less traveled</span><span class="walk-density-ramp"></span><span>More traveled</span></div>
 
   </section>
@@ -735,7 +736,7 @@ let currentPosMarker=null,walkPolyline=null,currentWalkCoords=[],watchId=null,is
 const ROUTE_STYLE_KEY='peeTrackerRouteStyle';
 let selectedHistoryWalkIndex=null;
 let preWalkViewMapState=null;
-let routeStyle=localStorage.getItem(ROUTE_STYLE_KEY)==='heatmap'?'heatmap':'lines';
+let routeStyle=['heatmap','frequency'].includes(localStorage.getItem(ROUTE_STYLE_KEY))?localStorage.getItem(ROUTE_STYLE_KEY):'lines';
 const peeMarkersLayer=L.layerGroup().addTo(map),walkPathsLayer=L.layerGroup().addTo(map);
 const selectedWalkLayer=L.layerGroup().addTo(map);
 const gpsReviewLayer=L.layerGroup().addTo(map);
@@ -909,7 +910,7 @@ function routeHeatWeight(zoom){
   return Math.round((2+Math.max(0,Math.min(4,zoom-14))*.3)*100)/100;
 }
 function updateRouteHeatWeight(){
-  if(selectedHistoryWalkIndex!==null||routeMode!=='filtered'||routeStyle!=='heatmap')return;
+  if(selectedHistoryWalkIndex!==null||routeMode!=='filtered'||routeStyle==='lines')return;
   const weight=routeHeatWeight(map.getZoom());
   walkPathsLayer.eachLayer(layer=>{
     if(layer.options?.routeHeatSegment&&layer.options.weight!==weight)layer.setStyle({weight});
@@ -955,9 +956,62 @@ function routeHeatSegments(walks){
     }
   }
 }
+// Experimental display-only corridor aggregation. No network requests or writes.
+function frequencyCorridors(paths){
+  const origin=paths.flat().find(p=>p&&Number.isFinite(p.lat)&&Number.isFinite(p.lng));
+  if(!origin)return [];
+  const sy=111195,sx=sy*Math.max(.01,Math.cos(origin.lat*Math.PI/180));
+  const project=p=>[(p.lng-origin.lng)*sx,(p.lat-origin.lat)*sy];
+  const unproject=p=>[origin.lat+p[1]/sy,origin.lng+p[0]/sx];
+  const buckets=new Map(),groups=[],cell=24;
+  const key=(x,y)=>`${x},${y}`;
+  function add(a,b,id){
+    const len=Math.hypot(b[0]-a[0],b[1]-a[1]);if(len<5)return;
+    let ux=(b[0]-a[0])/len,uy=(b[1]-a[1])/len;
+    const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;
+    const ix=Math.floor(mx/cell),iy=Math.floor(my/cell);let best=null,score=Infinity;
+    for(let x=ix-1;x<=ix+1;x++)for(let y=iy-1;y<=iy+1;y++)for(const g of buckets.get(key(x,y))||[]){
+      const dot=ux*g.ux+uy*g.uy;if(Math.abs(dot)<.85)continue;
+      const dx=mx-g.x,dy=my-g.y,along=Math.abs(dx*g.ux+dy*g.uy),across=Math.abs(-dx*g.uy+dy*g.ux);
+      if(along>8||across>16)continue;
+      const s=along*2+across;if(s<score){best=g;score=s;}
+    }
+    if(!best){best={x:mx,y:my,ux,uy,visits:new Map()};groups.push(best);const k=key(ix,iy);if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(best);}
+    // One representative observation per walk per corridor segment.
+    if(!best.visits.has(id))best.visits.set(id,{mx,my,ux,uy,len});
+  }
+  paths.forEach((path,id)=>{
+    let anchor=null,prev=null,remaining=16;
+    for(const p of path){
+      if(!p||!Number.isFinite(p.lat)||!Number.isFinite(p.lng)){anchor=prev=null;remaining=16;continue;}
+      const q=project(p);if(!prev){anchor=prev=q;continue;}
+      let d=Math.hypot(q[0]-prev[0],q[1]-prev[1]);
+      if(d>80){anchor=prev=q;remaining=16;continue;}
+      while(d>=remaining){const t=remaining/d,r=[prev[0]+(q[0]-prev[0])*t,prev[1]+(q[1]-prev[1])*t];add(anchor,r,id);anchor=prev=r;remaining=16;d=Math.hypot(q[0]-prev[0],q[1]-prev[1]);}
+      remaining-=d;prev=q;
+    }
+    if(anchor&&prev)add(anchor,prev,id);
+  });
+  return groups.map(g=>{
+    let x=0,y=0,ux=0,uy=0,len=0;const count=g.visits.size;
+    for(const v of g.visits.values()){const sign=v.ux*g.ux+v.uy*g.uy<0?-1:1;x+=v.mx;y+=v.my;ux+=sign*v.ux;uy+=sign*v.uy;len+=v.len;}
+    x/=count;y/=count;const norm=Math.hypot(ux,uy)||1;ux/=norm;uy/=norm;len=len/count/2+2;
+    return {count,points:[unproject([x-ux*len,y-uy*len]),unproject([x+ux*len,y+uy*len])]};
+  });
+}
+function renderFrequencyRoutes(walks){
+  const segments=frequencyCorridors(walks.map(w=>effectiveWalkPath(w.walk)));
+  const renderer=L.canvas({padding:.3});
+  for(const s of segments){
+    const ratio=walks.length>1?(s.count-1)/(walks.length-1):0;
+    const color=ratio>=.75?'#d34c35':ratio>=.5?'#ed8a2c':ratio>=.25?'#e5c63b':'#45a86a';
+    L.polyline(s.points,{color,weight:routeHeatWeight(map.getZoom()),opacity:.85,interactive:false,renderer,routeHeatSegment:true}).addTo(walkPathsLayer);
+  }
+}
+
 function updateRouteControls(){
   $('routeStyleSelector').hidden=selectedHistoryWalkIndex!==null||routeMode!=='filtered';
-  $('walkDensityLegend').hidden=selectedHistoryWalkIndex!==null||routeMode!=='filtered'||routeStyle!=='heatmap';
+  $('walkDensityLegend').hidden=selectedHistoryWalkIndex!==null||routeMode!=='filtered'||routeStyle==='lines';
   $('routeStyles').querySelectorAll('button').forEach(b=>{const active=b.dataset.style===routeStyle;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
 }
 function renderWalkRoutes(){
@@ -971,6 +1025,7 @@ function renderWalkRoutes(){
     const [start,end]=periodBounds(selectedPeriod,customRanges.map,Date.now(),true);
     const filtered=indexed.filter(x=>{const t=walkStart(x.walk);return start===-Infinity||(Number.isFinite(t)&&t>=start&&t<=end);});
     if(routeStyle==='heatmap'){routeHeatSegments(filtered);}
+    else if(routeStyle==='frequency'){renderFrequencyRoutes(filtered);}
     else filtered.forEach(x=>{
       L.polyline(effectiveWalkPath(x.walk).map(p=>[p.lat,p.lng]),{color:'#727d8d',weight:2,opacity:.38}).addTo(walkPathsLayer);
     });
@@ -1598,7 +1653,7 @@ $('routeStyles').addEventListener('click',event=>{
   localStorage.setItem(ROUTE_STYLE_KEY,routeStyle);
   if(routeMode==='filtered'&&routeStyle==='heatmap'&&peeMode==='heatmap')setPeeMode('off',{persist:false});
   renderWalkRoutes();
-  setStatus(routeStyle==='heatmap'?'Showing route frequency for the selected period.':'Showing individual filtered routes.');
+  setStatus(routeStyle==='frequency'?'Showing experimental consolidated route frequency.':routeStyle==='heatmap'?'Showing route frequency for the selected period.':'Showing individual filtered routes.');
 });
 function toggleHeatmap(){
   const next={heatmap:'clusters',clusters:'off',off:'heatmap'}[peeMode];
@@ -1616,7 +1671,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
-const APP_VERSION='1.5.33';
+const APP_VERSION='1.6.0';
 $('appVersionFooter').textContent='Pee Tracker v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
