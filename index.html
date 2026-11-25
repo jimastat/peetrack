@@ -1649,7 +1649,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
-const APP_VERSION='1.7.2';
+const APP_VERSION='1.7.3';
 $('appVersionFooter').textContent='Pee Tracker v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
@@ -2238,8 +2238,8 @@ let badges=[],filter='All';const el=id=>document.getElementById(id);const fmt=v=
  const count=all.filter(b=>b.earned).length;
  let status;
  if(count===all.length){status='<span class="ach-category-complete">✓ Complete</span>';}else{
- const next=all.find(b=>!b.earned),previous=k===6?0:(all.filter(b=>b.earned).at(-1)?.m||0);
- const pct=k===6?count/all.length*100:Math.max(0,Math.min(100,(next.v-previous)/(next.m-previous)*100));
+ const next=all.find(b=>!b.earned);
+ const pct=k===6?count/all.length*100:Math.max(0,Math.min(100,next.v/next.m*100));
  const units=['miles','steps','walks','pees','locations','days'];
  const label=k===6?`${Math.round(pct)}% collected`:`${fmt(next.v)} / ${fmt(next.m)} ${units[k]}`;
  status=`<div class="ach-category-status"><div class="ach-progress" role="progressbar" aria-label="${c} ${k===6?'collection completion':'progress toward next badge'}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-valuetext="${label}"><i style="width:${pct}%"></i></div><span>${label}</span></div>`;
