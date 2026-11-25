@@ -454,7 +454,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
 .custom-calendar{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;aspect-ratio:1;padding:0!important;border:1px solid #d7e0eb;border-radius:9px;background:#f5f7fb;color:#35465d;flex-shrink:0;min-width:28px}
 #mapFilters{align-items:stretch}#mapFilters .custom-calendar{height:auto;align-self:stretch}#mapFilters .custom-calendar svg{display:block}
 .insight-heading-actions{display:flex;align-items:center;gap:8px}.insight-heading-actions .custom-calendar{width:32px;height:32px}.custom-calendar.active{background:#1769e8;color:white;border-color:#1769e8}
-.custom-range-editor,.custom-range-label{margin:7px 0;padding:9px;border-radius:10px;background:#eef4ff;color:#24466d;font-size:12px}.custom-range-editor[hidden],.custom-range-label[hidden]{display:none!important}.custom-date-fields,.custom-range-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}.custom-date-fields label{min-width:0}.custom-date-fields input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:16px;line-height:1.2;height:32px;min-height:32px;padding:3px 4px;border:1px solid #d7e0eb;border-radius:8px;background:white;color:#172235;-webkit-appearance:none;appearance:none}.custom-date-fields{column-gap:10px}.custom-date-fields input::-webkit-date-and-time-value{min-width:0;margin:0;text-align:center}.custom-date-fields input::-webkit-datetime-edit{padding:0}.custom-range-actions button,.custom-range-label button{border:1px solid #d7e0eb;border-radius:8px;background:white;color:#24466d;padding:8px;font-weight:700}.custom-range-actions button:last-child{background:#1769e8;color:white}.custom-range-actions button:disabled{opacity:.5}.custom-range-label{display:flex;align-items:center;gap:7px}.custom-range-label span{flex:1}.custom-range-label button{padding:3px 9px}.custom-range-label svg{flex-shrink:0}
+.custom-range-editor,.custom-range-label{margin:7px 0;padding:9px;border-radius:10px;background:#eef4ff;color:#24466d;font-size:12px}.custom-range-editor[hidden],.custom-range-label[hidden]{display:none!important}.custom-date-fields,.custom-range-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}.custom-date-fields label{min-width:0}.custom-date-fields input{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:14px;line-height:1.2;height:32px;min-height:32px;padding:3px 4px;border:1px solid #d7e0eb;border-radius:8px;background:white;color:#172235;-webkit-appearance:none;appearance:none}.custom-date-fields{column-gap:10px}.custom-date-fields input::-webkit-date-and-time-value{min-width:0;margin:0;text-align:center}.custom-date-fields input::-webkit-datetime-edit{padding:0}.custom-range-actions button,.custom-range-label button{border:1px solid #d7e0eb;border-radius:8px;background:white;color:#24466d;padding:8px;font-weight:700}.custom-range-actions button:last-child{background:#1769e8;color:white}.custom-range-actions button:disabled{opacity:.5}.custom-range-label{display:flex;align-items:center;gap:7px}.custom-range-label span{flex:1}.custom-range-label button{padding:3px 9px}.custom-range-label svg{flex-shrink:0}
 </style>
 </head>
   
@@ -1031,7 +1031,7 @@ function updateStats(){
   $('undoPeeBtn').disabled=data.pees.length===0;
   if(selectedHistoryWalkIndex!==null){
     $('mapCount').innerHTML=`${visiblePees().length} pee events<span>Selected walk · ${peeMode==='heatmap'?(selectedPeriod==='all'?'all-time':'filtered')+' heatmap + walk markers':peeMode==='clusters'?'selected-walk pee markers':'route only · pee markers off'}</span>`;
-  }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='custom'?rangeLabel(customRanges.map):selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${peeMode==='heatmap'?'heatmap':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
+  }else $('mapCount').innerHTML=`${visiblePees().length} of ${data.pees.length} pee events<span>${selectedPeriod==='custom'?customRanges.map.map(d=>{const [y,m,day]=d.split('-');return `${m}/${day}/${y.slice(-2)}`;}).join(' – '):selectedPeriod==='all'?'All time':selectedPeriod==='today'?'Today':selectedPeriod==='week'?'Last 7 days':'Last 30 days'} · ${peeMode==='heatmap'?'heatmap':peeMode==='clusters'?'grouped markers':'pee layer off'}</span>`;
   $('footerStats').textContent=`${data.walks.length} walks · ${data.pees.length} pee events logged`;
   const last=data.walks[data.walks.length-1];
   if(last){
@@ -1604,7 +1604,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
-const APP_VERSION='1.5.30';
+const APP_VERSION='1.5.31';
 $('appVersionFooter').textContent='Pee Tracker v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
