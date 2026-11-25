@@ -427,7 +427,7 @@ body:not(.walk-active) .map-card .live-walk-dashboard{display:none!important}
 :root{--app-header-height:80px;--header-top:env(safe-area-inset-top,0px)}
 #app{padding-top:var(--app-header-height)}
 #app > header{position:fixed;top:var(--header-top);left:50%;transform:translateX(-50%);width:min(100%,900px);margin:0;z-index:1200}
-#insightsHeader{position:sticky;top:calc(var(--header-top) + var(--app-header-height));z-index:1100;background:var(--panel);display:flow-root;margin:-15px -15px 0;padding:15px 15px 0;border-radius:22px 22px 0 0;box-shadow:0 3px 4px -4px #17223555}
+#insightsHeader{position:relative;top:auto;z-index:1100;background:var(--panel);display:flow-root;margin:-15px -15px 0;padding:15px 15px 0;border-radius:22px 22px 0 0;box-shadow:0 3px 4px -4px #17223555}
 #insightsPeriods{scroll-margin-top:calc(var(--header-top) + var(--app-header-height) + 45px)}
 @media(max-width:420px){#app{padding-top:var(--app-header-height)}#insightsHeader{margin:-13px -13px 0;padding:13px 13px 0}}
 @media(min-width:700px){#app{padding-top:var(--app-header-height)}#insightsHeader{margin:-18px -18px 0;padding:18px 18px 0}}
@@ -483,6 +483,9 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
 #achCollection .ach-category-status .ach-progress{margin:0 0 3px;height:6px;background:#d4ded8}
 #achCollection .ach-category-status .ach-progress i{background:#c6a052}
 #achCollection .ach-category-complete{flex-shrink:0;font-size:12px;font-weight:600;color:#8a6926}
+
+/* v1.7.4: dock only while expanded Insights is the active section. */
+#insightsHeader.insights-docked{position:sticky;top:calc(var(--header-top) + var(--app-header-height))}
 </style>
 <style>
 #achievements{background:var(--panel,#fff);border:1px solid #c6a66a;border-radius:20px;padding:15px;margin:12px 0;color:#263c31} .ach-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ach-head h2{font-size:18px;margin:0}.ach-link{background:none!important;color:#2563eb!important;border:0!important;padding:8px!important}.ach-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ach-grid button{background:#fff;color:#344054;border:1px solid #dce3de;border-radius:12px;padding:8px 3px;min-width:0;display:flex;flex-direction:column;align-items:center;font-size:12px;gap:3px}.ach-art{width:100%;max-width:100px;display:block}.ach-locked{opacity:.38;filter:grayscale(.7)}.ach-progress{height:7px;background:#e4eae5;border-radius:8px;overflow:hidden;margin:7px 0}.ach-progress i{display:block;height:100%;background:#347d75}.ach-muted{font-size:12px;color:#64748b}.ach-dialog{width:min(100%,650px);max-width:100%;max-height:95dvh;border:0;border-radius:18px;padding:0;background:#f3f5f4;color:#263c31;overflow:auto}.ach-dialog::backdrop{background:#0008}.ach-dialog header{position:sticky;top:0;background:#193d2a;color:#fff2d2;padding:14px;z-index:2}.ach-dialog header button{background:#fff;color:#193d2a;border:0;border-radius:8px;padding:8px}.ach-body{padding:14px}.ach-filters{display:flex;gap:6px;margin-top:10px}.ach-filters button{flex:1}.ach-filters button[aria-pressed=true]{background:#d6b05e;color:#193d2a}.ach-dialog h3{margin:18px 0 8px}.ach-detail-art{width:150px;margin:auto}.ach-detail-art .ach-art{max-width:150px}.ach-dialog p{line-height:1.5}.ach-close{width:100%;padding:12px;margin-top:10px}.ach-dialog[open]{display:block}
@@ -1649,7 +1652,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
-const APP_VERSION='1.7.3';
+const APP_VERSION='1.7.4';
 $('appVersionFooter').textContent='Pee Tracker v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
@@ -2251,5 +2254,40 @@ function detail(b){el('achDetailBody').innerHTML=`<div class="ach-detail-art">${
 el('achOpen').onclick=()=>{refresh();filter='All';gallery();el('achGallery').showModal()};el('achClose').onclick=()=>el('achGallery').close();el('achDetailClose').onclick=()=>el('achDetail').close();el('achFilters').onclick=e=>{let b=e.target.closest('[data-filter]');if(b){filter=b.dataset.filter;gallery()}};[el('achRecent'),el('achCollection')].forEach(x=>x.onclick=e=>{let b=e.target.closest('[data-badge]');if(b)detail(badges.find(a=>a.id===b.dataset.badge))});window.refreshAchievements=()=>{try{refresh()}catch(e){console.error('Achievements update failed',e)}};window.achievementSnapshot=()=>{try{return new Set(calculate().filter(b=>b.earned).map(b=>b.id))}catch(e){return null}};window.achievementCelebrate=before=>{try{if(!before)return;refresh();let newly=badges.filter(b=>b.earned&&!before.has(b.id));if(!newly.length)return;let seen=new Set(JSON.parse(localStorage.getItem('peeTrackerCelebratedBadges')||'[]'));newly=newly.filter(b=>!seen.has(b.id));if(!newly.length)return;newly.forEach(b=>seen.add(b.id));localStorage.setItem('peeTrackerCelebratedBadges',JSON.stringify([...seen]));toast(`${newly.length} achievement${newly.length===1?'':'s'} unlocked!`);el('achDetailBody').innerHTML=`<h2>Achievement${newly.length===1?'':'s'} unlocked!</h2><div class="ach-grid">${newly.map(b=>`<div>${art(b)}<strong>${b.name}</strong></div>`).join('')}</div>`;el('achDetail').showModal();}catch(e){console.error('Achievement celebration failed',e)}};window.refreshAchievements();
 })();
 
-</script></body>
+</script>
+<script>
+(() => {
+  const toolbar = document.getElementById('insightsHeader');
+  const details = document.getElementById('insightDetails');
+  const achievements = document.getElementById('achievements');
+  const mainHeader = document.querySelector('#app > header');
+  let pending = false;
+  function update() {
+    pending = false;
+    const viewport = window.visualViewport;
+    const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+    const top = mainHeader.getBoundingClientRect().bottom;
+    const boundary = top + Math.max(0, bottom - top) / 2;
+    toolbar.classList.toggle('insights-docked', details.classList.contains('open') && achievements.getBoundingClientRect().top > boundary);
+  }
+  function schedule() {
+    if (!pending) { pending = true; requestAnimationFrame(update); }
+  }
+  window.addEventListener('scroll', schedule, {passive:true});
+  window.addEventListener('resize', schedule, {passive:true});
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', schedule, {passive:true});
+    window.visualViewport.addEventListener('scroll', schedule, {passive:true});
+  }
+  new MutationObserver(schedule).observe(details, {attributes:true, attributeFilter:['class']});
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(schedule);
+    observer.observe(toolbar.parentElement);
+    observer.observe(achievements);
+    observer.observe(mainHeader);
+  }
+  update();
+})();
+</script>
+</body>
 </html>
