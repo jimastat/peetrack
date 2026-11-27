@@ -502,7 +502,9 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
 
 /* v2.0.3: wordmark fit and badge finishing */
 #app > header .brand{container-type:inline-size;}
-#app > header .daily-sniff-wordmark{font-size:clamp(12px,5.5vw,36px);font-size:clamp(10px,13.8cqi,36px);line-height:1.12;}
+/* v2.1.3: enlarge the header wordmark without changing header dimensions. */
+#app > header .daily-sniff-wordmark{font-size:clamp(12px,6.05vw,40px);font-size:clamp(10px,15cqi,40px);line-height:1.12;}
+@media(max-height:420px){body.walk-active #app > header .daily-sniff-wordmark{font-size:clamp(12px,5.5vw,36px);font-size:clamp(10px,13.8cqi,36px);}}
 .ach-art:not(.ach-locked){filter:drop-shadow(0 2px 2px rgba(26,38,31,.24));}
 .ach-art.ach-locked{filter:grayscale(.7) drop-shadow(0 2px 2px rgba(26,38,31,.24));}
 #achDetail .ach-detail-art.ach-special-detail{width:144px;max-width:100%;}
@@ -1763,7 +1765,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
 const APP_NAME='The Daily Sniff';
-const APP_VERSION='2.1.2';
+const APP_VERSION='2.1.3';
 $('appVersionFooter').textContent=APP_NAME+' v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
