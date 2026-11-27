@@ -511,7 +511,26 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
 </style>
 <style>
 #achievements{background:var(--panel,#fff);border:1px solid #c6a66a;border-radius:20px;padding:15px;margin:12px 0;color:#263c31} .ach-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ach-head h2{font-size:18px;margin:0}.ach-link{background:none!important;color:#2563eb!important;border:0!important;padding:8px!important}.ach-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.ach-grid button{background:#fff;color:#344054;border:1px solid #dce3de;border-radius:12px;padding:8px 3px;min-width:0;display:flex;flex-direction:column;align-items:center;font-size:12px;gap:3px}.ach-art{width:100%;max-width:100px;display:block}.ach-locked{opacity:.38;filter:grayscale(.7)}.ach-progress{height:7px;background:#e4eae5;border-radius:8px;overflow:hidden;margin:7px 0}.ach-progress i{display:block;height:100%;background:#347d75}.ach-muted{font-size:12px;color:#64748b}.ach-dialog{width:min(100%,650px);max-width:100%;max-height:95dvh;border:0;border-radius:18px;padding:0;background:#f3f5f4;color:#263c31;overflow:auto}.ach-dialog::backdrop{background:#0008}.ach-dialog header{position:sticky;top:0;background:#193d2a;color:#fff2d2;padding:14px;z-index:2}.ach-dialog header button{background:#fff;color:#193d2a;border:0;border-radius:8px;padding:8px}.ach-body{padding:14px}.ach-filters{display:flex;gap:6px;margin-top:10px}.ach-filters button{flex:1}.ach-filters button[aria-pressed=true]{background:#d6b05e;color:#193d2a}.ach-dialog h3{margin:18px 0 8px}.ach-detail-art{width:150px;margin:auto}.ach-detail-art .ach-art{max-width:150px}.ach-dialog p{line-height:1.5}.ach-close{width:100%;padding:12px;margin-top:10px}.ach-dialog[open]{display:block}
-</style></head>
+</style><style>
+/* v2.1.0: reuse the dashboard map and Map Options in a viewport-filling workspace. */
+#mapFullscreenToggle{position:absolute;top:12px;right:12px;z-index:501;width:38px;height:38px;display:flex;align-items:center;justify-content:center;border:0;border-radius:11px;background:#fff;color:#254b3c;box-shadow:0 2px 8px #17223524;padding:0;cursor:pointer}
+#mapFullscreenToggle svg{width:22px;height:22px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#mapFullscreenToggle .collapse-icon{display:none}
+body.walk-active #mapFullscreenToggle,body.gps-review-active #mapFullscreenToggle{display:none!important}
+body:not(.walk-active):not(.gps-review-active) .map-card #peeDensityLegend{right:58px}
+#mapFullscreenWorkspace[hidden]{display:none!important}
+html.map-fullscreen,html.map-fullscreen body{overflow:hidden;overscroll-behavior:none}
+#mapFullscreenWorkspace{position:fixed;inset:0;z-index:1500;height:100vh;height:100dvh;display:flex;flex-direction:column;background:var(--bg);padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);overflow:hidden;overscroll-behavior:contain}
+#mapFullscreenWorkspace>.map-card{flex:1 1 0;min-height:0;min-width:0;border-radius:0;box-shadow:none}
+#mapFullscreenWorkspace #map{height:100%;width:100%}
+#mapFullscreenWorkspace #mapFullscreenToggle .expand-icon{display:none}
+#mapFullscreenWorkspace #mapFullscreenToggle .collapse-icon{display:block}
+#mapFullscreenWorkspace #walkOperations{flex:0 0 auto;max-height:55%;overflow-y:auto;overscroll-behavior:contain;border-radius:0;padding:9px 11px 10px;box-shadow:0 -2px 10px #17223518;min-width:0}
+#mapFullscreenWorkspace #walkOperations>.action-grid,#mapFullscreenWorkspace #walkHistoryBtn{display:none!important}
+body:not(.walk-active) #mapFullscreenWorkspace #mapOptionsToggle{position:static;width:100%;min-height:46px}
+@media(max-height:420px){#mapFullscreenWorkspace #walkOperations{max-height:55%;padding-block:5px}body:not(.walk-active) #mapFullscreenWorkspace #mapOptionsToggle{min-height:38px}}
+</style>
+</head>
   
 <body>
 <div id="app">
@@ -527,6 +546,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
       <button id="locateBtn" aria-label="Center map on current location" title="Center on me">➤</button>
       <button id="mapLayerBtn" aria-label="Pee display: Heatmap. Tap for clusters" title="Pee display: Heatmap">🔥</button>
     </div>
+    <button type="button" id="mapFullscreenToggle" aria-label="Expand map" aria-pressed="false" title="Expand map"><svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></svg><svg class="collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h5V4m11 5h-5V4M9 20v-5H4m11 5v-5h5"/></svg></button>
     <div class="map-legend" id="peeDensityLegend"><div>Pee density</div><div class="gradient"></div><div style="display:flex;justify-content:space-between;color:#748096;font-size:10px;font-weight:500;margin-top:3px"><span>Less</span><span>More</span></div></div>
     <div class="map-count" id="mapCount">0 pee events<span>All recorded locations</span></div>
     <div id="liveWalkDashboard" class="live-walk-dashboard" hidden aria-label="Current walk statistics">
@@ -641,6 +661,8 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
       <p class="settings-help">Paw steps are an estimate based on distance and a Labrador gait reference, not a sensor reading. Shoulder height adjusts the estimate approximately. Weight and sex are saved for your dog's profile but don't alter the estimate.</p>
       <label class="settings-check"><input type="checkbox" id="offerGapReview"> Offer GPS gap review after walks</label>
       <p class="settings-help">When a completed walk contains suspicious GPS gaps, ask whether to review them. Corrections require your approval, and original GPS points are preserved. You can always open GPS Review from Walk History.</p>
+      <label class="settings-check"><input type="checkbox" id="keepScreenAwake" aria-describedby="wakeLockHelp"> Keep screen awake during walks</label>
+      <p class="settings-help" id="wakeLockHelp">Prevents automatic screen locking while recording a walk when supported by your browser. May increase battery consumption.</p>
       <h3>📍 Pee location grouping</h3>
       <label for="peeLocationRadius">Distinct location radius: <strong id="peeLocationRadiusValue">20 meters</strong></label>
       <input id="peeLocationRadius" type="range" min="5" max="50" step="5" value="20" aria-describedby="peeLocationRadiusHelp">
@@ -711,6 +733,7 @@ body.gps-review-active #app{padding-top:calc(var(--app-header-height) + 6px)}
     </div>
   </section>
 </div>
+<div id="mapFullscreenWorkspace" role="region" aria-label="Full-screen map" hidden></div>
 <div id="toast"></div><dialog class="ach-dialog" id="achGallery" aria-labelledby="achGalleryTitle"><header><div class="ach-head"><button id="achClose" aria-label="Back to main screen">‹ Back</button><strong id="achGalleryTitle">Achievements</strong><span aria-hidden="true" class="ach-award">🏅</span></div><div class="ach-count-row"><span id="achGalleryCount"></span><div class="ach-progress" role="progressbar" aria-label="Badges earned" aria-valuemin="0" aria-valuemax="60" id="achGalleryProgress"><i></i></div></div><div class="ach-filters" id="achFilters"><button data-filter="All">All</button><button data-filter="Earned">Earned</button><button data-filter="Locked">Locked</button></div></header><div class="ach-body" id="achCollection"></div></dialog><dialog class="ach-dialog" id="achDetail"><div class="ach-body" id="achDetailBody"></div><div class="ach-body"><button class="ach-close" id="achDetailClose">Continue</button></div></dialog>
 
 <dialog id="locationNameDialog" aria-labelledby="locationNameTitle"><form id="locationNameForm"><h2 id="locationNameTitle">Name pee location</h2><p id="locationNameSummary"></p><input aria-label="Location name" placeholder="Enter location name" id="locationNameInput" maxlength="80" required autocomplete="off" enterkeyhint="done" autofocus><div class="location-name-buttons"><button type="button" id="locationNameCancel">Cancel</button><button type="submit" id="locationNameSave">Save</button></div></form></dialog>
@@ -728,7 +751,7 @@ function cleanNames(items){return Array.isArray(items)?items.filter(n=>n&&typeof
 let data=loadData();
 data.locationNames=cleanNames(data.locationNames);
 const PREFS_KEY='peeTrackerPreferences';
-const DEFAULT_PREFS={name:'Stevie',breed:'Labrador Retriever',weight:75,height:null,sex:'female',showPawSteps:true,offerGapReview:false,peeLocationRadius:20};
+const DEFAULT_PREFS={name:'Stevie',breed:'Labrador Retriever',weight:75,height:null,sex:'female',showPawSteps:true,offerGapReview:false,keepScreenAwake:true,peeLocationRadius:20};
 function sanitizePrefs(raw){
   const p=raw&&typeof raw==='object'?raw:{};
   const num=(v,min,max)=>v!==null&&v!==undefined&&v!==''&&Number.isFinite(Number(v))&&Number(v)>=min&&Number(v)<=max?Number(v):null;
@@ -738,6 +761,7 @@ function sanitizePrefs(raw){
     sex:['female','male','unknown'].includes(p.sex)?p.sex:DEFAULT_PREFS.sex,
     showPawSteps:typeof p.showPawSteps==='boolean'?p.showPawSteps:true,
     offerGapReview:p.offerGapReview===true,
+    keepScreenAwake:p.keepScreenAwake!==false,
     peeLocationRadius:Number.isFinite(Number(p.peeLocationRadius))?Math.max(5,Math.min(50,Math.round(Number(p.peeLocationRadius)/5)*5)):20};
 }
 function loadPrefs(){try{return sanitizePrefs({...DEFAULT_PREFS,...JSON.parse(localStorage.getItem(PREFS_KEY)||'{}')});}catch(e){return {...DEFAULT_PREFS};}}
@@ -1458,11 +1482,35 @@ function syncWalkControls(){
   if(!isWalking)$('walkStatus').textContent='Not walking';
   requestAnimationFrame(()=>map.invalidateSize());
 }
+// Screen wake lock is best-effort and independent of GPS tracking.
+let screenWakeLock=null, wakeRequestPending=false;
+function wantsWakeLock(){return isWalking&&prefs.keepScreenAwake&&document.visibilityState==='visible';}
+async function releaseWalkWakeLock(){
+  const lock=screenWakeLock;screenWakeLock=null;
+  if(lock)try{await lock.release();}catch(e){console.debug('Wake lock release unavailable',e);}
+}
+async function syncWalkWakeLock(){
+  if(!wantsWakeLock()){await releaseWalkWakeLock();return;}
+  if(screenWakeLock&&!screenWakeLock.released||wakeRequestPending||!navigator.wakeLock?.request)return;
+  wakeRequestPending=true;
+  const walkId=currentWalkId;
+  try{
+    const lock=await navigator.wakeLock.request('screen');
+    if(!wantsWakeLock()||currentWalkId!==walkId){await lock.release();return;}
+    screenWakeLock=lock;
+    lock.addEventListener('release',()=>{if(screenWakeLock===lock)screenWakeLock=null;});
+  }catch(e){console.debug('Screen wake lock unavailable',e);}
+  finally{wakeRequestPending=false;if(wantsWakeLock()&&currentWalkId!==walkId)void syncWalkWakeLock();}
+}
+document.addEventListener('visibilitychange',()=>{void syncWalkWakeLock();});
+window.addEventListener('pageshow',()=>{void syncWalkWakeLock();});
+window.addEventListener('pagehide',()=>{void releaseWalkWakeLock();});
 function startWalk(){
   if(isWalking){setStatus('A walk is already in progress.');return;}
   if(!navigator.geolocation){setStatus('Geolocation is not supported.');return;}
   setMapOptionsExpanded(false);
   isWalking=true;currentWalkCoords=[];currentWalkId=Date.now();
+  void syncWalkWakeLock();
   walkDashboardStartedAt=Date.now();
   if(walkDashboardTimer!==null)clearInterval(walkDashboardTimer);
   walkDashboardTimer=setInterval(updateLiveWalkDashboard,1000);
@@ -1487,6 +1535,7 @@ function startWalk(){
 function endWalk(){
   if(!isWalking){setStatus('No walk is currently in progress.');return;}
   isWalking=false;
+  void releaseWalkWakeLock();
   if(walkDashboardTimer!==null){clearInterval(walkDashboardTimer);walkDashboardTimer=null;}
   if(watchId!==null)navigator.geolocation.clearWatch(watchId);watchId=null;
   if(currentWalkCoords.length){
@@ -1681,7 +1730,7 @@ $('insightsPeriods').addEventListener('click',event=>{const b=event.target.close
 // Profile preferences are separate from walk/pee storage to avoid changing GPS data.
 const settingsOverlay=$('settingsOverlay');
 const APP_NAME='The Daily Sniff';
-const APP_VERSION='2.0.7';
+const APP_VERSION='2.1.1';
 $('appVersionFooter').textContent=APP_NAME+' v'+APP_VERSION;
 $('aboutLinkVersion').textContent='Version '+APP_VERSION;
 $('aboutVersion').textContent='Version '+APP_VERSION;
@@ -1710,6 +1759,7 @@ function openSettings(){
   $('dogWeight').value=prefs.weight??'';$('dogHeight').value=prefs.height??'';
   $('dogSex').value=prefs.sex;$('showPawSteps').checked=prefs.showPawSteps;
   $('offerGapReview').checked=prefs.offerGapReview;
+  $('keepScreenAwake').checked=prefs.keepScreenAwake;
   $('peeLocationRadius').value=prefs.peeLocationRadius;
   $('peeLocationRadiusValue').textContent=prefs.peeLocationRadius+' meters';
   settingsOverlay.hidden=false;document.body.style.overflow='hidden';
@@ -1735,9 +1785,10 @@ $('settingsForm').addEventListener('submit',e=>{
   prefs=sanitizePrefs({name:$('dogName').value,breed:$('dogBreed').value,
     weight:$('dogWeight').value,height:$('dogHeight').value,sex:$('dogSex').value,
     showPawSteps:$('showPawSteps').checked,offerGapReview:$('offerGapReview').checked,
+    keepScreenAwake:$('keepScreenAwake').checked,
     peeLocationRadius:$('peeLocationRadius').value});
   localStorage.setItem(PREFS_KEY,JSON.stringify(prefs));
-  updateInsights();closeSettings();toast('Settings saved');
+  updateInsights();closeSettings();void syncWalkWakeLock();toast('Settings saved');
 });
 
 $('exportBtn').addEventListener('click',()=>{
@@ -1770,7 +1821,7 @@ $('importFile').addEventListener('change',async event=>{
     const merged={walks:[...data.walks,...newWalks],pees:[...data.pees,...newPees],locationNames:[...(data.locationNames||[]),...newNames]};
     localStorage.setItem(STORE_KEY,JSON.stringify(merged));
     data=merged;
-    if(incomingPrefs){prefs=incomingPrefs;localStorage.setItem(PREFS_KEY,JSON.stringify(prefs));}
+    if(incomingPrefs){prefs=incomingPrefs;localStorage.setItem(PREFS_KEY,JSON.stringify(prefs));void syncWalkWakeLock();}
     renderExistingData();map.closePopup();
     setStatus(`Imported ${newPees.length} pee events and ${newWalks.length} walks.`);
     toast('Backup imported successfully');
@@ -2236,6 +2287,75 @@ walkHistoryOverlay.addEventListener('click',e=>{if(e.target===walkHistoryOverlay
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!walkHistoryOverlay.hidden)closeWalkHistory();});
 
 window.addEventListener('resize',()=>map.invalidateSize());
+
+// A single map and a single Map Options panel, moved temporarily (not cloned).
+// This preserves listeners, Leaflet layers, route state and the existing filters.
+(() => {
+  const workspace=$('mapFullscreenWorkspace'), toggle=$('mapFullscreenToggle');
+  const card=document.querySelector('.map-card'), operations=$('walkOperations');
+  const cardAnchor=document.createComment('map dashboard position');
+  const operationsAnchor=document.createComment('map options dashboard position');
+  card.before(cardAnchor); operations.before(operationsAnchor);
+  let expandedBefore=false, scrollBefore=0, active=false, pending=0;
+  let inertBefore=[];
+  function resizeMap(){
+    if(pending)cancelAnimationFrame(pending);
+    pending=requestAnimationFrame(()=>{
+      pending=0;
+      map.invalidateSize({animate:false,pan:true});
+    });
+  }
+  function updateViewport(){
+    if(!active)return;
+    const v=window.visualViewport;
+    // Keep date controls reachable when the mobile keyboard reduces the viewport.
+    if(v){workspace.style.height=`${v.height}px`;workspace.style.top=`${v.offsetTop}px`;}
+    resizeMap();
+  }
+  function enter(){
+    if(active||isWalking||gpsReviewState)return;
+    expandedBefore=mapOptionsExpanded;scrollBefore=window.scrollY;
+    active=true;
+    setMapOptionsExpanded(false);
+    workspace.hidden=false;
+    workspace.append(card,operations);
+    document.documentElement.classList.add('map-fullscreen');
+    // Disable dashboard interaction without disabling its existing popup dialogs.
+    inertBefore=[];
+    for(const node of document.body.children){
+      if(node===workspace||node.id==='toast'||node.matches('script,style,dialog,.data-overlay'))continue;
+      inertBefore.push([node,node.inert]);node.inert=true;
+    }
+    toggle.setAttribute('aria-label','Exit full-screen map');toggle.title='Exit full-screen map';toggle.setAttribute('aria-pressed','true');
+    updateViewport();toggle.focus({preventScroll:true});
+  }
+  function exit(){
+    if(!active)return;
+    active=false;
+    cardAnchor.after(card);operationsAnchor.after(operations);
+    workspace.hidden=true;workspace.style.removeProperty('height');workspace.style.removeProperty('top');
+    document.documentElement.classList.remove('map-fullscreen');
+    for(const [node,previous] of inertBefore)node.inert=previous;
+    inertBefore=[];
+    setMapOptionsExpanded(expandedBefore);
+    toggle.setAttribute('aria-label','Expand map');toggle.title='Expand map';toggle.setAttribute('aria-pressed','false');
+    window.scrollTo(0,scrollBefore);toggle.focus({preventScroll:true});
+    resizeMap();
+  }
+  toggle.addEventListener('click',()=>active?exit():enter());
+  document.addEventListener('keydown',e=>{
+    if(!active||e.key!=='Escape'||document.querySelector('dialog[open],.data-overlay:not([hidden])'))return;
+    e.preventDefault();exit();
+  });
+  // Reflow tiles and heat layers whenever the existing Map Options panel changes size.
+  if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(active)resizeMap();}).observe(card);
+  else operations.addEventListener('click',()=>{if(active)resizeMap();});
+  window.addEventListener('resize',updateViewport,{passive:true});
+  window.visualViewport?.addEventListener('resize',updateViewport,{passive:true});
+  window.visualViewport?.addEventListener('scroll',updateViewport,{passive:true});
+  // Defensive guard: should a walk/review start from another code path, restore dashboard.
+  new MutationObserver(()=>{if(active&&(isWalking||gpsReviewState))exit();}).observe(document.body,{attributes:true,attributeFilter:['class']});
+})();
 </script>
 <script>
 /* v1.2.4: cosmetic shadow only; does not affect map or tracking. */
